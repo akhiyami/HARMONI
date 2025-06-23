@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot</title>
+    <style>
+        body { font-family: Arial; margin: 2rem; }
+        #chatbox { border: 1px solid #ccc; padding: 1rem; height: 400px; overflow-y: scroll; margin-top: 0.5rem ;}
+        .msg { margin: 0.5rem 0; }
+        .user { color: blue; }
+        .bot { color: green; }
+        .system { color: gray; }
+        .error { color: red; }
+
+        .user-image-box, #preview {
+            width: 90%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border: 1px solid #000;
+            padding: 30px;
+            box-sizing: border-box;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        #preview {
+            background: #fff;
+            padding: 0;
+            border:0;
+        }
+
+        #user_info {
+            display: flex;
+            width: 100%;
+        }
+        #user {
+            text-align: center;
+            width: 15%;
+            vertical-align: top;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #user_placeholder.user-image-box {
+            display: inline-block;
+        }
+        #user_placeholder img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+        }
+        #preview {
+            display: none;
+        }
+        .user-label-container {
+            margin-top: 0.5em;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .user-label {
+            padding: 0.5em 1em;
+            background: #aaa;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            display: block;
+            margin: 0 5%;
+            box-sizing: border-box;
+        }
+        #imageInput {
+            display: none;
+        }
+
+        #history {
+            width: 50%;
+            padding: 0.5rem 1rem;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+        }
+
+        #chat-form {
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #question {
+            width: 100%;
+            padding: 1rem;
+            margin: 0.5rem 0.5rem;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1.1rem;
+        }
+
+        .submit {
+            padding: 0.7em 2em; 
+            background: #4CAF50; 
+            color: #fff; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 1.1rem; 
+            cursor: pointer; 
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Assistant Virtuel</h1>
+
+
+    <div id="user_info">
+        
+        <div id="user">
+            <div id="user_placeholder" class="user-image-box">
+                <img src="static/image_pholder.png" alt="Image de l'utilisateur actif">
+            </div>
+            <img id="preview" src="" alt="Image de l'utilisateur actif">
+
+            <div class="user-label-container">
+                <label for="imageInput" class="user-label">
+                    Utilisateur actif
+                    <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
+                </label>
+            </div>
+        </div>
+        
+
+        <div id="history">
+            <h3 style="margin:0; padding:0.5rem">Historique des conversations :</h3>
+            <span id="live_history"></span>
+        </div>
+
+    </div>
+
+    <div id="chatbox"></div>
+
+    <form id="chat-form">
+        <input type="text" id="question" required placeholder="Entrez votre question...">
+        <button type="submit" class="submit" >
+            Envoyer
+        </button>
+    </form>
+
+    <script>
+        //dynamic style
+        const user_field= document.getElementById("user");
+        const history = document.getElementById("history");
+        history.style.height = `${user_field.offsetHeight}px`;
+
+        //constants
+        const chatbox = document.getElementById("chatbox");
+        const form = document.getElementById("chat-form");
+        const questionInput = document.getElementById("question");
+        const live_history = document.getElementById("live_history");
+
+        //global variables
+        let userId = ""; // Default user ID
+        
+        questionInput.value = ""
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const question = questionInput.value.trim();
+            const user = userId; 
+
+            questionInput.value = "";
+
+            if (!user) {
+                addMessage("Erreur", "Veuillez sélectionner un utilisateur actif.", "error");
+                questionInput.value = ""
+                return;
+            }
+
+            if (!question) return;
+
+            addMessage(user, question, "user");
+
+            const response = await fetch("/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({question, user})
+            });
+
+            const data = await response.json();
+            if (data.answer) {
+                addMessage("Assistant", data.answer, "bot");
+            } else {
+                addMessage("Erreur", data.error || "Erreur inconnue", "bot");
+            }
+
+            if (Array.isArray(data.history)) {
+                live_history.innerHTML = data.history.map(
+                    msg => {
+                        if (msg.role === "assistant") {
+                            return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
+                        } else {
+                            return `${msg.role} : ${msg.content}`;
+                        }
+                    }
+                ).join('<br>');
+            } else {
+                live_history.innerHTML = "";
+            }
+        });
+
+        function addMessage(sender, text, role) {
+            const div = document.createElement("div");
+            div.className = `msg ${role}`;
+            div.textContent = `${sender}: ${text}`;
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            const preview = document.getElementById('preview');
+            const userPlaceholder = document.getElementById('user_placeholder');
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'inline';
+                    userPlaceholder.style.display = 'none';
+
+                    const formData = new FormData();
+                    formData.append('image', file);
+
+                    fetch('/set_user', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        addMessage("Change user", data.user_id, "system");
+                        userId = data.user_id; 
+
+                        if (Array.isArray(data.history)) {
+                            live_history.innerHTML = data.history.map(
+                                msg => {
+                                    if (msg.role === "assistant") {
+                                        return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
+                                    } else {
+                                        return `${msg.role} : ${msg.content}`;
+                                    }
+                                }
+                            ).join('<br>');
+                        } else {
+                            live_history.innerHTML = "";
+                        }
+                    })
+                    .catch(error => {
+                        // Optionally handle error
+                        // Example: addMessage("Erreur", "Échec de l'envoi de l'image.", "system");
+                    });
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.src = '';
+                preview.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

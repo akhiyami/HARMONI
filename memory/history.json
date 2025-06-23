@@ -1,0 +1,22 @@
+{
+    "user1": [
+        {"role": "user", "content": "Bonjour"},
+        {"role": "assistant", "content": "Bonjour ! Comment puis-je vous aider aujourd'hui ?"},
+        {"role": "user", "content": "Comment je m'appelle?"},
+        {"role": "assistant", "content": "Désolé, je ne connais pas encore votre nom. Comment vous appelez-vous ?"},
+        {"role": "user", "content": "coucou"},
+        {"role": "assistant", "content": "Salut ! Que puis-je faire pour vous ?"}
+    ],
+    "user2": [
+        {"role": "user", "content": "J'aime la nourriture italienne"},
+        {"role": "assistant", "content": "La nourriture italienne est délicieuse ! As-tu un plat italien préféré ?"},
+        {"role": "user", "content": "la pizza"},
+        {"role": "assistant", "content": "Excellent choix ! As-tu une garniture préférée ?"}
+    ],
+    "user3": [
+        {"role": "user", "content": "Salut"},
+        {"role": "assistant", "content": "Salut ! Comment puis-je t'aider aujourd'hui ?"},
+        {"role": "user", "content": "J'aime les comédies"},
+        {"role": "assistant", "content": "Super ! As-tu un film ou une série de comédie préférée ?"}
+    ]
+}

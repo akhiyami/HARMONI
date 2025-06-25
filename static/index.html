@@ -131,7 +131,7 @@
         
 
         <div id="history">
-            <h3 style="margin:0; padding:0.5rem">Historique des conversations :</h3>
+            <h3 style="margin:0; padding:0.5rem">A propos :</h3>
             <span id="live_history"></span>
         </div>
 
@@ -193,19 +193,19 @@
                 addMessage("Erreur", data.error || "Erreur inconnue", "bot");
             }
 
-            if (Array.isArray(data.history)) {
-                live_history.innerHTML = data.history.map(
-                    msg => {
-                        if (msg.role === "assistant") {
-                            return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
-                        } else {
-                            return `${msg.role} : ${msg.content}`;
-                        }
-                    }
-                ).join('<br>');
-            } else {
-                live_history.innerHTML = "";
-            }
+            // if (Array.isArray(data.history)) {
+            //     live_history.innerHTML = data.history.map(
+            //         msg => {
+            //             if (msg.role === "assistant") {
+            //                 return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
+            //             } else {
+            //                 return `${msg.role} : ${msg.content}`;
+            //             }
+            //         }
+            //     ).join('<br>');
+            // } else {
+            //     live_history.innerHTML = "";
+            // }
         });
 
         function addMessage(sender, text, role) {
@@ -239,19 +239,25 @@
                         addMessage("Change user", data.user_id, "system");
                         userId = data.user_id; 
 
-                        if (Array.isArray(data.history)) {
-                            live_history.innerHTML = data.history.map(
-                                msg => {
-                                    if (msg.role === "assistant") {
-                                        return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
-                                    } else {
-                                        return `${msg.role} : ${msg.content}`;
-                                    }
-                                }
-                            ).join('<br>');
-                        } else {
+                        // if (Array.isArray(data.history)) {
+                        //     live_history.innerHTML = data.history.map(
+                        //         msg => {
+                        //             if (msg.role === "assistant") {
+                        //                 return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
+                        //             } else {
+                        //                 return `${msg.role} : ${msg.content}`;
+                        //             }
+                        //         }
+                        //     ).join('<br>');
+                        // } else {
+                        //     live_history.innerHTML = "";
+                        // }
+                        if (!data.history) {
                             live_history.innerHTML = "";
+                        } else {
+                            live_history.innerHTML = data.history.replace(/\n/g, '<br>');
                         }
+                        
                     })
                     .catch(error => {
                         // Optionally handle error

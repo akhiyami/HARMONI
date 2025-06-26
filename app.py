@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 
 from llm.openai_utils import ask_llm
 from memory.memory import user_retriever, load_users, update_ltm
-from config import HISTORY_FILE
+from config import HISTORY_FILE, LEN_HISTORY
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
@@ -25,7 +25,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 current_user = None
 current_session = []
 users_data = load_users()
-
 
 @app.get("/", response_class=HTMLResponse)
 async def get_home():
@@ -44,6 +43,21 @@ async def ask(question: str = Form(...)):
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
 
+    def update_and_reload():
+        global current_session
+        lt_interactions = current_session[0:-LEN_HISTORY]
+        if not isinstance(lt_interactions, list):
+            lt_interactions = [lt_interactions]
+        update_ltm(user_id, lt_interactions)
+        current_session = current_session[-LEN_HISTORY:]
+        global users_data
+        users_data = load_users()
+        print(f"Updated long-term memory for user {user_id}")
+
+    if len(current_session) > LEN_HISTORY:
+        thread = threading.Thread(target=update_and_reload)
+        thread.start()
+
     return {"answer": answer, "history": current_session}
 
 @app.post("/set_user")
@@ -60,10 +74,11 @@ async def set_user(image: UploadFile = File(...)):
 
         def update_and_reload():
             if current_user is not None:
+                user = current_user
                 update_ltm(current_user, current_session)
-                # Signal: reload users_data after update
                 global users_data
                 users_data = load_users()
+                print(f"Updated long-term memory for user {user}")
 
         thread = threading.Thread(target=update_and_reload)
         thread.start()

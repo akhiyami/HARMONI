@@ -9,4 +9,4 @@ if not API_KEY:
 
 HISTORY_FILE = "memory/history.json"
 USERS_FILE = "memory/users.json"
-LEN_HISTORY = 10
+LEN_HISTORY = 20

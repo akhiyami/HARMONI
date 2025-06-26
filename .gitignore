@@ -2,6 +2,8 @@
 
 # Projet-specific files
 users.json
+/data
+/static/users_images
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

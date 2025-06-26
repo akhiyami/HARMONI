@@ -25,7 +25,7 @@ def user_retriever(encodings, users_data):
         stored = data.get("encodings", [])
         if stored:
             distance = np.linalg.norm(np.array(encodings[0]) - np.array(stored))
-            if distance < 0.5:
+            if distance < 0.4:
                 return user_id, data.get("user_memory", "")
 
     new_user_id = f"user{len(users_data) + 1}"
@@ -38,18 +38,32 @@ def user_retriever(encodings, users_data):
 
     return new_user_id, user_history
 
-def update_ltm(user_id, current_session):
-    users_data = load_users()
-    if user_id in users_data:
-        user_data = users_data[user_id]
+def update_ltm(user_id, current_session, ltm=None):
+    if ltm is None:
+        users_data = load_users()
+        if user_id in users_data:
+            user_data = users_data[user_id]
 
-        old_memory = user_data.get("user_memory", "")
+            old_memory = user_data.get("user_memory", "")
+            new_memory = current_session
+
+            if new_memory != []:
+                updated_memory = update_memory(old_memory, new_memory)
+                users_data[user_id]["user_memory"] = updated_memory
+                save_user(users_data)
+
+        else:
+            print(f"{user_id} not found in users data.") 
+
+    elif isinstance(ltm, str):
+        old_memory = ltm
         new_memory = current_session
 
         if new_memory != []:
             updated_memory = update_memory(old_memory, new_memory)
-            users_data[user_id]["user_memory"] = updated_memory
-            save_user(users_data)
-
-    else:
-        print(f"{user_id} not found in users data.") 
+            ltm = updated_memory
+            return ltm
+        
+        else:
+            print("No new memory to update.")
+            return ltm

@@ -2,6 +2,8 @@ from collections import deque
 from openai import OpenAI
 from config import API_KEY, LEN_HISTORY
 
+from pydantic import BaseModel
+
 client = OpenAI(api_key=API_KEY)
 
 context = {
@@ -9,6 +11,14 @@ context = {
     "content": (
         "Tu es un assistant virtuel qui peut discuter et répondre, en s'aidant d'informtions stockée sous forme de mémoire à long terme \n"
         "Tu privilégies les réponses courtes et concises\n"
+    ),
+}
+
+qa_instructions = {
+    "role": "system",
+    "content": (
+        "Tu es un assistant virtuel qui peut discuter et répondre, en s'aidant d'informtions stockée sous forme de mémoire à long terme \n"
+        "Tu réponds ici en quelques mots, sans faire de phrase, dans le cadre d'un quizz.\n"
     ),
 }
 
@@ -29,6 +39,10 @@ memory_instructions = {
         "La mémoire doit aider à maintenir la continuité du dialogue et permettre des réponses adaptées à la personnalité de l'utilisateur."
     ),
 }
+
+class StructuredOutput(BaseModel):
+    answer: str
+    updated_memory: str
         
 
 def ask_llm(question, history, memory):
@@ -44,6 +58,20 @@ def ask_llm(question, history, memory):
     )
 
     return completion.choices[0].message.content.strip()
+
+def answer_question(question, memory):
+    ltm = {
+        "role": "system",
+        "content": memory,
+    }
+
+    completion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[context, ltm, {"role": "user", "content": question}],
+    )
+
+    return completion.choices[0].message.content.strip()
+
 
 def update_memory(old_memory, new_memory):
     

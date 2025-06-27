@@ -38,7 +38,14 @@ async def ask(question: str = Form(...)):
 
     memory_user = users_data.get(user_id, {}).get("user_memory", [])
 
-    answer = ask_llm(question, current_session, memory_user)
+    output = ask_llm(question, current_session, memory_user)
+
+    print(output)
+
+    answer = output.answer
+
+    new_memory = output.updated_memory
+    print(f"New memory for user {user_id}: {new_memory}")
 
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})

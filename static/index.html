@@ -193,19 +193,14 @@
                 addMessage("Erreur", data.error || "Erreur inconnue", "bot");
             }
 
-            // if (Array.isArray(data.history)) {
-            //     live_history.innerHTML = data.history.map(
-            //         msg => {
-            //             if (msg.role === "assistant") {
-            //                 return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
-            //             } else {
-            //                 return `${msg.role} : ${msg.content}`;
-            //             }
-            //         }
-            //     ).join('<br>');
-            // } else {
-            //     live_history.innerHTML = "";
-            // }
+            if (!data.profile) {
+                live_history.innerHTML = "";
+            } else {
+                live_history.innerHTML = data.profile.map(
+                    item => `<span style="color:gray">${item.name}: ${item.description}</span>`
+                ).join('<br>');
+            }
+            
         });
 
         function addMessage(sender, text, role) {
@@ -239,23 +234,12 @@
                         addMessage("Change user", data.user_id, "system");
                         userId = data.user_id; 
 
-                        // if (Array.isArray(data.history)) {
-                        //     live_history.innerHTML = data.history.map(
-                        //         msg => {
-                        //             if (msg.role === "assistant") {
-                        //                 return `<span style="color:gray">${msg.role} : ${msg.content}</span>`;
-                        //             } else {
-                        //                 return `${msg.role} : ${msg.content}`;
-                        //             }
-                        //         }
-                        //     ).join('<br>');
-                        // } else {
-                        //     live_history.innerHTML = "";
-                        // }
-                        if (!data.history) {
+                        if (!data.profile) {
                             live_history.innerHTML = "";
                         } else {
-                            live_history.innerHTML = data.history.replace(/\n/g, '<br>');
+                            live_history.innerHTML = data.profile.map(
+                                item => `<span style="color:gray">${item.name}: ${item.description}</span>`
+                            ).join('<br>');
                         }
                         
                     })

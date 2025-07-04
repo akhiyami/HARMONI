@@ -19,7 +19,7 @@ def save_user(user_data):
         except TypeError as e:
             print(f"Erreur lors de l'enregistrement de l'utilisateur: {e}")
 
-def user_retriever(encodings, users_data):
+def user_retriever(encodings, users_data, conn=None):
     for user_id, data in users_data.items():
         stored = data.get("encodings", [])
         if stored:
@@ -35,4 +35,18 @@ def user_retriever(encodings, users_data):
     save_user(users_data)
     user_history = ""
 
+    if conn:
+        cursor = conn.cursor()
+        # Convert the encodings list to bytes for BLOB storage
+        embeddings_blob = np.array(users_data[new_user_id]["encodings"], dtype=np.float32).tobytes()
+        cursor.execute(
+            "INSERT INTO user_embeddings (user_id, embeddings) VALUES (?, ?)",
+            (len(users_data), embeddings_blob)
+        )
+        # create a new table for user
+        cursor.execute(
+            f"CREATE TABLE IF NOT EXISTS {new_user_id} (name TEXT, description TEXT, tags TEXT, value TEXT, embeddings BLOB)"
+        )
+        conn.commit()
+    
     return new_user_id, user_history

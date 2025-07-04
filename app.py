@@ -18,6 +18,11 @@ import face_recognition
 import threading
 from collections import deque
 
+import sqlite3
+
+database = 'memory/users.db'
+conn = sqlite3.connect(database)
+
 # Init FastAPI app
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -50,13 +55,29 @@ async def ask(question: str = Form(...)):
     for item in new_memory_dict:
         if item["name"] not in [feature["name"] for feature in memory_user]:
             memory_user.append(item)
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"INSERT INTO {user_id} (name, description, tags, value, embeddings) VALUES (?, ?, ?, ?, ?)",
+                    (item["name"], item["description"], (";").join(item["tags"]), (";").join(item["value"]), None)
+                )
+                conn.commit()
+
         else:
             for feature in memory_user:
                 if feature["name"] == item["name"]:
                     feature["description"] = item["description"]
                     feature["tags"] = item["tags"]
                     feature["value"] = item["value"]
+                    if conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            f"UPDATE {user_id} SET description = ?, tags = ?, value = ? WHERE name = ?",
+                            (item["description"], (";").join(item["tags"]), (";").join(item["value"]), item["name"])
+                        )
+                        conn.commit()
                     break
+
 
 
     current_session.append({"role": "user", "content": question})
@@ -74,7 +95,8 @@ async def set_user(image: UploadFile = File(...)):
     img_array = np.array(img)
     encodings = face_recognition.face_encodings(img_array)
 
-    new_user, new_memory = user_retriever(encodings, users_data)
+    new_user, new_memory = user_retriever(encodings, users_data, conn)
+
     if new_user != current_user :
 
         save_user(users_data)

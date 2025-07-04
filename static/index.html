@@ -197,7 +197,7 @@
                 live_history.innerHTML = "";
             } else {
                 live_history.innerHTML = data.profile.map(
-                    item => `<span style="color:gray">${item.name}: ${item.description}</span>`
+                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</em></span>`
                 ).join('<br>');
             }
             
@@ -238,7 +238,7 @@
                             live_history.innerHTML = "";
                         } else {
                             live_history.innerHTML = data.profile.map(
-                                item => `<span style="color:gray">${item.name}: ${item.description}</span>`
+                                item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
                             ).join('<br>');
                         }
                         

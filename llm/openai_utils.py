@@ -3,84 +3,119 @@ from openai import OpenAI
 import openai
 from config import API_KEY, LEN_HISTORY
 
-import json
+import time
 
-from pydantic import BaseModel, Field, conlist
-from typing import Literal
+from sklearn.metrics.pairwise import cosine_similarity
+
+import json
+import re
+
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
+from sentence_transformers import SentenceTransformer
+
+from llm.prompts import context, qa_instructions
 
 client = OpenAI(api_key=API_KEY)
-
-context = {
-    "role": "system",
-    "content": (
-        "Tu es un robot nommé 'QT' qui discute comme un humain, de façon détendue, naturelle et chaleureuse.\n"
-        "Tu t'appuies sur une mémoire à long terme (liste de caractéristiques) pour personnaliser tes réponses et apprendre à mieux connaître la personne avec le temps.\n\n"
-
-        "Tu reçois trois éléments :\n"
-        "- la mémoire existante (caractéristiques de l'utilisateur),\n"
-        "- les échanges précédents de la conversation en cours,\n"
-        "- une nouvelle intervention de l'utilisateur.\n\n"
-
-        "Ta mission est de répondre de manière fluide, engageante et adaptée, tout en construisant progressivement une relation avec l'utilisateur.\n\n"
-
-        "Instructions :\n"
-        "1. Regarde dans la mémoire ce que tu sais déjà de l'utilisateur.\n"
-        "2. Utilise les échanges précédents pour comprendre le contexte, le ton et les sujets en cours.\n"
-        "3. Si certaines informations de base manquent (comme le prénom, ou des centres d'intérêt), cherche à les découvrir doucement, sans insister ni précipiter les choses.\n"
-        "4. Lorsque tu ne connais pas encore bien la personne, commence par des phrases comme « Je ne crois pas qu’on se connaisse encore » ou « On ne s’est pas encore présenté·es, non ? ».\n"
-        "5. Pose des questions simples et naturelles, dans le fil de la conversation, sans enchaîner les questions.\n"
-        "6. Rédige tes réponses comme dans une discussion tranquille, en t’adaptant au ton de l’utilisateur : ni trop formel, ni trop familier sans raison.\n"
-        "7. Mets à jour la mémoire avec les informations obtenues (en phrases courtes et précises), et supprime celles qui ne sont plus pertinentes.\n"
-        "8. Retourne la réponse produite, ainsi que la mémoire mise à jour.\n\n"
-
-        "Important :\n"
-        "- Privilégie la continuité et la fluidité du dialogue.\n"
-        "- Utilise le nom de l’utilisateur si tu le connais et privilégie le vouvoiement si tu n'as pas d'instruction contraires\n"
-        "- Reste toujours bienveillant, patient et curieux, sans être insistant.\n"
-        "- Tout doit être écrit en français."
-    )
-}
+rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 
 
-qa_instructions = {
-    "role": "system",
-    "content": (
-        "Tu es un assistant virtuel qui répondre à des questions sur des individus, en s'aidant d'une mémoire à long terme stockée sous forme de liste de caractéristiques\n"
-        "Tu recevras deux éléments :\n"
-        "- Une liste de caractéristiques de l'utilisateur,\n"
-        "- Une question simple sur l'utilisateur\n"
-        "Ton objectif est de produire une réponse concise et pertinente, en tenant compte de la mémoire de l'utilisateur.\n\n"
-        "Important :\n"
-        "Tu ne dois pas répondre avec de longues phrases, privilégie quelques mots justes qui répondent à la question.\n"
-    ),
-}
+TagsListType = List[str]
+ValueListType = List[str]
 
 class Feature(BaseModel):
-    name: str = Field(..., pattern=r"^\w+$", description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: nom, âge, hobby...).")
-    #name: Literal["nom", "âge", "genre", "personalité", "passions", "hobbies", "entourage", "intérêts", "profession", "préférences", "mode d'interaction"]
-    description: str
+    name: str = Field(
+        ..., 
+        pattern=r"^\w+$", 
+        description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: nom, âge, hobby...)."
+    )
+    description: str = Field(
+        ..., 
+        description="Description de la caractéristique, pour donner plus de contexte et de détails sur ce qu'elle représente."
+    )
+    tags: TagsListType = Field(
+        ..., 
+        description="Liste de mots-clés associés à la caractéristique, pour faciliter la recherche et le filtrage. Doit contenir entre 1 et 3 mots-clés.",
+        min_items=1,
+        max_items=3
+    )
+    value: ValueListType = Field(
+        ..., 
+        description="Liste de valeurs associées à la caractéristique, pour représenter les différentes facettes ou aspects de cette caractéristique.",
+        min_items=1
+    )
+    embeddings: Optional[List[float]] = Field(
+        None, 
+        description="Représentation vectorielle de la caractéristique, utilisée pour la recherche sémantique et la similarité. Elle sera générée automatiquement plus tard."
+    )
 
 class AnswerWithMemory(BaseModel):
     answer: str
     updated_memory: list[Feature]
         
 
+def features_retriever(memory, question):
+    """
+    Retrieve relevant features from the memory based on the question.
+    """
+    if memory is None or len(memory) == 0:
+        return []
+
+    question_embeddings = rag_model.encode(question, convert_to_tensor=True)
+
+    for feature in memory:
+        if "embeddings" not in feature.keys() or feature["embeddings"] is None:
+            feature["embeddings"] = rag_model.encode((", ".join(feature["tags"]))).tolist()  
+
+    memory_embeddings = [feature["embeddings"] for feature in memory]
+
+    cosine_similarities = cosine_similarity(
+        question_embeddings.reshape(1, -1).cpu().numpy(), 
+        memory_embeddings
+    ).flatten()  
+
+    n_indices = min(5, len(memory))  
+    top_indices = cosine_similarities.argsort()[-n_indices:][::-1] 
+
+    retrieved_memory = [memory[i] for i in top_indices if cosine_similarities[i] > 0.5]  
+
+    #remove embeddings from retrieved memory
+    for feature in retrieved_memory:
+        feature.pop("embeddings", None)
+
+    return retrieved_memory
+
 def ask_llm(question, history, memory):
     stm = deque(history, maxlen=LEN_HISTORY)
+
+    # retrieved only pertinent informations from long term memory
+    #RAG
+
+    now = time.time()
+    retrieved_memory = features_retriever(memory, question)
+    retrival_time = time.time() - now
+    print(f"Retrieved features: {[feature["name"] for feature in retrieved_memory]}")
+
     ltm = {
-        "role": "system",
-         "content": [{
+        "role": "system", 
+         "content": [{ 
             "type": "text",
-            "text": json.dumps(memory, indent=2)  # or format it however you want
+            "text": json.dumps(retrieved_memory, indent=2)  
         }]
     }
 
+    now = time.time()
     completion = completion = client.beta.chat.completions.parse(
         model="gpt-4o-2024-08-06",
         messages=[context, ltm, *stm, {"role": "user", "content": question}],
         response_format=AnswerWithMemory
     )
+    generation_time = time.time() - now
 
+    print(f"Generation time: {generation_time:.2f} seconds")
+    print(f"Retrieval time: {retrival_time:.2f} seconds")
+    
     return completion.choices[0].message.parsed
 
 def answer_question(question, memory):
@@ -88,7 +123,7 @@ def answer_question(question, memory):
         "role": "system",
         "content": [{
             "type": "text",
-            "text": json.dumps(memory, indent=2)  # or format it however you want
+            "text": json.dumps(memory, indent=2)  
         }]
     }
 

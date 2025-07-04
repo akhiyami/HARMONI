@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 
 from llm.openai_utils import ask_llm
 from memory.memory import user_retriever, load_users, save_user
-from config import HISTORY_FILE, LEN_HISTORY
+from config import LEN_HISTORY
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
@@ -44,14 +44,27 @@ async def ask(question: str = Form(...)):
     answer = output.answer
 
     new_memory_object = output.updated_memory
-    new_memory = [{"name": item.name, "description": item.description} for item in new_memory_object]
+
+    new_memory_dict = [{"name": item.name, "description": item.description, "tags": item.tags, "value": item.value} for item in new_memory_object]
+
+    for item in new_memory_dict:
+        if item["name"] not in [feature["name"] for feature in memory_user]:
+            memory_user.append(item)
+        else:
+            for feature in memory_user:
+                if feature["name"] == item["name"]:
+                    feature["description"] = item["description"]
+                    feature["tags"] = item["tags"]
+                    feature["value"] = item["value"]
+                    break
+
 
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
-    
-    users_data[user_id]["user_memory"] = new_memory
 
-    return {"answer": answer, "profile": new_memory}
+    users_data[user_id]["user_memory"] = memory_user
+
+    return {"answer": answer, "profile": memory_user}
 
 @app.post("/set_user")
 async def set_user(image: UploadFile = File(...)):

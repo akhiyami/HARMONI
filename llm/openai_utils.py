@@ -25,6 +25,7 @@ rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 TagsListType = List[str]
 ValueListType = List[str]
 
+
 class Feature(BaseModel):
     name: str = Field(
         ..., 
@@ -56,61 +57,73 @@ class AnswerWithMemory(BaseModel):
     updated_memory: list[Feature]
         
 
-def features_retriever(memory, question, conn=None, user_id=None):
+def features_retriever(question, conn, user_id):
     """
     Retrieve relevant features from the memory based on the question.
     """
-    if memory is None or len(memory) == 0:
-        return []
+    
+    question_embeddings = rag_model.encode(question, convert_to_tensor=True).cpu().numpy()  
+    
+    cursor = conn.cursor()
 
-    question_embeddings = rag_model.encode(question, convert_to_tensor=True)
-
-    for feature in memory:
-        if "embeddings" not in feature.keys() or feature["embeddings"] is None:
-            feature["embeddings"] = rag_model.encode((", ".join(feature["tags"]))).tolist()  
-
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT rowid, tags FROM {user_id} WHERE embeddings IS NULL")
-        rows = cursor.fetchall()
-        for row in rows:
-            rowid, tags = row
+    #Update embeddings for features that do not have them
+    cursor.execute(f"SELECT rowid, tags, embeddings FROM {user_id}")
+    rows = cursor.fetchall()
+    cosine_similarities = {}
+    for row in rows:
+        rowid, tags, embedding = row
+        if embedding is None:
             tags_list = tags.split(";")
-            embeddings = rag_model.encode(", ".join(tags_list)).tolist()
-            embeddings_blob = np.array(embeddings, dtype=np.float32).tobytes()  # Convert to bytes for BLOB storage
+            embedding = rag_model.encode(", ".join(tags_list)).tolist()
+            embedding = np.array(embedding, dtype=np.float32).tobytes()  #Convert to bytes for BLOB storage
             cursor.execute(
                 f"UPDATE {user_id} SET embeddings = ? WHERE rowid = ?",
-                (embeddings_blob, rowid)
+                (embedding, rowid)
             )
+            conn.commit()
+        
+        cs = cosine_similarity(
+            question_embeddings.reshape(1, -1), 
+            np.frombuffer(embedding, dtype=np.float32).reshape(1, -1)
+        ).flatten()
+        cosine_similarities[rowid] = cs[0]
 
-        conn.commit()
+        COSINE_THESHOLD = 0.5
+        filtered = [(rowid, sim) for rowid, sim in cosine_similarities.items() if sim > COSINE_THESHOLD]
+        
+        top_filtered = sorted(filtered, key=lambda x: x[1], reverse=True)[:5]
+        top_indices = [rowid for rowid, _ in top_filtered]
 
-    memory_embeddings = [feature["embeddings"] for feature in memory]
+        if top_indices:
+            cursor.execute(
+                f"SELECT name, description, tags, value FROM {user_id} WHERE rowid IN ({','.join(['?']*len(top_indices))})", 
+                top_indices
+            )
+            rows = cursor.fetchall()
+        else:
+            rows = []
 
-    cosine_similarities = cosine_similarity(
-        question_embeddings.reshape(1, -1).cpu().numpy(), 
-        memory_embeddings
-    ).flatten()  
+    memory = []
+    for row in rows:
+        name, description, tags, value = row
+        feature = {
+            "name": name,
+            "description": description,
+            "tags": tags.split(";") if tags else [],
+            "value": value.split(";")
+        }
+        memory.append(feature)
 
-    n_indices = min(5, len(memory))  
-    top_indices = cosine_similarities.argsort()[-n_indices:][::-1] 
+    return memory
 
-    retrieved_memory = [memory[i] for i in top_indices if cosine_similarities[i] > 0.5]  
 
-    #remove embeddings from retrieved memory
-    for feature in retrieved_memory:
-        feature.pop("embeddings", None)
-
-    return retrieved_memory
-
-def ask_llm(question, history, memory, conn=None, current_user=None):
+def ask_llm(question, history, conn=None, current_user=None):
     stm = deque(history, maxlen=LEN_HISTORY)
 
     # retrieved only pertinent informations from long term memory
     #RAG
-
     now = time.time()
-    retrieved_memory = features_retriever(memory, question, conn= conn, user_id=current_user)
+    retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
     retrival_time = time.time() - now
     print(f"Retrieved features: {[feature["name"] for feature in retrieved_memory]}")
 
@@ -134,6 +147,7 @@ def ask_llm(question, history, memory, conn=None, current_user=None):
     print(f"Retrieval time: {retrival_time:.2f} seconds")
     
     return completion.choices[0].message.parsed
+
 
 def answer_question(question, memory):
     ltm = {

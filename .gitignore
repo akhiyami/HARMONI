@@ -2,8 +2,11 @@
 
 # Projet-specific files
 users.json
+users.db
 /data
 /static/users_images
+test.ipynb
+inference.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -44,7 +44,7 @@ async def ask(question: str = Form(...)):
 
     memory_user = users_data.get(user_id, {}).get("user_memory", [])
 
-    output = ask_llm(question, current_session, memory_user)
+    output = ask_llm(question, current_session, memory_user, conn=conn, current_user=user_id)
 
     answer = output.answer
 

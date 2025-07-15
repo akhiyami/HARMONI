@@ -9,6 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import json
 import re
+import numpy as np
 
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -55,7 +56,7 @@ class AnswerWithMemory(BaseModel):
     updated_memory: list[Feature]
         
 
-def features_retriever(memory, question):
+def features_retriever(memory, question, conn=None, user_id=None):
     """
     Retrieve relevant features from the memory based on the question.
     """
@@ -67,6 +68,22 @@ def features_retriever(memory, question):
     for feature in memory:
         if "embeddings" not in feature.keys() or feature["embeddings"] is None:
             feature["embeddings"] = rag_model.encode((", ".join(feature["tags"]))).tolist()  
+
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT rowid, tags FROM {user_id} WHERE embeddings IS NULL")
+        rows = cursor.fetchall()
+        for row in rows:
+            rowid, tags = row
+            tags_list = tags.split(";")
+            embeddings = rag_model.encode(", ".join(tags_list)).tolist()
+            embeddings_blob = np.array(embeddings, dtype=np.float32).tobytes()  # Convert to bytes for BLOB storage
+            cursor.execute(
+                f"UPDATE {user_id} SET embeddings = ? WHERE rowid = ?",
+                (embeddings_blob, rowid)
+            )
+
+        conn.commit()
 
     memory_embeddings = [feature["embeddings"] for feature in memory]
 
@@ -86,14 +103,14 @@ def features_retriever(memory, question):
 
     return retrieved_memory
 
-def ask_llm(question, history, memory):
+def ask_llm(question, history, memory, conn=None, current_user=None):
     stm = deque(history, maxlen=LEN_HISTORY)
 
     # retrieved only pertinent informations from long term memory
     #RAG
 
     now = time.time()
-    retrieved_memory = features_retriever(memory, question)
+    retrieved_memory = features_retriever(memory, question, conn= conn, user_id=current_user)
     retrival_time = time.time() - now
     print(f"Retrieved features: {[feature["name"] for feature in retrieved_memory]}")
 

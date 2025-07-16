@@ -30,6 +30,7 @@ import face_recognition
 from llm.openai_utils import ask_llm
 from memory.memory import user_retriever, update_memory
 from config import LEN_HISTORY
+from memory.utils import create_table
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
 
@@ -41,6 +42,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition
 # Database connection
 database = 'memory/users.db'
 conn = sqlite3.connect(database)
+create_table(conn)      # Create the embeddings table if it does not exist
 
 # Init FastAPI app
 app = FastAPI()

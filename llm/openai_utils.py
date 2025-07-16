@@ -22,7 +22,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Optional
 
-from config import API_KEY, LEN_HISTORY
+from config import API_KEY, LEN_HISTORY, NUM_TOP_FEATURES
 from llm.prompts import context, qa_instructions
 
 ##########
@@ -112,7 +112,6 @@ def features_retriever(question, conn, user_id):
         filtered = [(rowid, sim) for rowid, sim in cosine_similarities.items() if sim > COSINE_THESHOLD]
         
         # Sort and limit the results to the top n most relevant features
-        NUM_TOP_FEATURES = 5
         top_filtered = sorted(filtered, key=lambda x: x[1], reverse=True)[:NUM_TOP_FEATURES]
         top_indices = [rowid for rowid, _ in top_filtered]
         

@@ -22,8 +22,8 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Optional
 
-from config import API_KEY, LEN_HISTORY
-from llm.prompts import context, qa_instructions
+from config import API_KEY, LEN_HISTORY, NUM_TOP_FEATURES
+from llm.prompts import context
 
 ##########
 
@@ -44,26 +44,26 @@ class Feature(BaseModel):
     name: str = Field(
         ..., 
         pattern=r"^\w+$", 
-        description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: nom, âge, hobby...)."
+        description="Must be a single word without spaces or special characters, describing the category of a user feature (e.g., name, age, hobby...)."
     )
     description: str = Field(
         ..., 
-        description="Description de la caractéristique, pour donner plus de contexte et de détails sur ce qu'elle représente."
+        description="Description of the feature, providing more context and details about what it represents."
     )
     tags: TagsListType = Field(
         ..., 
-        description="Liste de mots-clés associés à la caractéristique, pour faciliter la recherche et le filtrage. Doit contenir entre 1 et 3 mots-clés.",
+        description="List of keywords associated with the feature, to facilitate search and filtering. Must contain between 1 and 3 keywords.",
         min_items=1,
         max_items=3
     )
     value: ValueListType = Field(
         ..., 
-        description="Liste de valeurs associées à la caractéristique, pour représenter les différentes facettes ou aspects de cette caractéristique.",
+        description="List of values associated with the feature, representing the different facets or aspects of this feature.",
         min_items=1
     )
     embeddings: Optional[List[float]] = Field(
         None, 
-        description="Représentation vectorielle de la caractéristique, utilisée pour la recherche sémantique et la similarité. Elle sera générée automatiquement plus tard."
+        description="Vector representation of the feature, used for semantic search and similarity. It will be generated automatically later."
     )
 
 # Define a Pydantic model for the answer with updated memory
@@ -71,7 +71,6 @@ class AnswerWithMemory(BaseModel):
     answer: str
     updated_memory: list[Feature]
         
-
 ############
 # Function Definitions
 ############
@@ -112,7 +111,6 @@ def features_retriever(question, conn, user_id):
         filtered = [(rowid, sim) for rowid, sim in cosine_similarities.items() if sim > COSINE_THESHOLD]
         
         # Sort and limit the results to the top n most relevant features
-        NUM_TOP_FEATURES = 5
         top_filtered = sorted(filtered, key=lambda x: x[1], reverse=True)[:NUM_TOP_FEATURES]
         top_indices = [rowid for rowid, _ in top_filtered]
         
@@ -187,31 +185,3 @@ def ask_llm(question, history, conn=None, current_user=None):
     # Parse the answer and updated memory from the completion
     return completion.choices[0].message.parsed
 
-
-def answer_question(question, memory):
-    """
-    Answer a question using the LLM with the provided memory.
-    This function prepares the context and sends the request to the LLM.
-    -----
-    Args:
-        question (str): The question to ask the LLM.
-        memory (list): The user's memory to be used as context.
-    Returns:
-        str: The answer from the LLM.
-    """
-    ltm = {
-        "role": "system",
-        "content": [{
-            "type": "text",
-            "text": json.dumps(memory, indent=2)  
-        }]
-    }
-
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[qa_instructions, ltm, {"role": "user", "content": question}],
-    )
-
-    return completion.choices[0].message.content
-
-   

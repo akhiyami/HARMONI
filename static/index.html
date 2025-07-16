@@ -8,7 +8,7 @@
 </head>
 
 <body>
-    <h1>Assistant Virtuel</h1>
+    <h1>Virtual Assistant</h1>
 
     <!-- Section utilisateur : image et profil -->
     <div id="user_info">
@@ -22,7 +22,7 @@
 
             <div class="user-label-container">
                 <label for="imageInput" class="user-label">
-                    Utilisateur actif
+                    Current User
                     <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
                 </label>
             </div>
@@ -30,7 +30,7 @@
         
         <!-- User profile (live updated) -->
         <div id="profile">
-            <h3 style="margin:0; padding:0.5rem">A propos :</h3>
+            <h3 style="margin:0; padding:0.5rem">About:</h3>
             <span id="live_profile"></span>
         </div>
 
@@ -41,9 +41,9 @@
 
     <!-- Chat form for user input -->
     <form id="chat-form">
-        <input type="text" id="question" required placeholder="Entrez votre question...">
+        <input type="text" id="question" required placeholder="Write your question...">
         <button type="submit" class="submit" >
-            Envoyer
+            Send
         </button>
     </form>
 

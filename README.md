@@ -1,6 +1,6 @@
 # Context-aware conversation
 
-> [!INFO]  
+> [!NOTE]  
 > This branch is a working version of the application, in **english version**
 A simple interface to chat with a virtual assistant with a visual memory of users.  
 

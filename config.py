@@ -1,12 +1,13 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
 
+# Load environment variables
+load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     raise ValueError("Please set the OPENAI_API_KEY environment variable.")
 
-
+# Default configuration values
 LEN_HISTORY = 10
-DISTANCE_THRESHOLD = 0.4  # Distance threshold for user retrieval
+RECOGNITION_THRESHOLD = 0.4  # Distance threshold for user retrieval

@@ -1,3 +1,8 @@
+"""
+Prompts for the LLM to handle conversations and Q&A with memory management.
+"""
+
+# Context for the conversation, wth instructions for the LLM to answer and update the memory.
 context = {
     "role": "system",
     "content": (
@@ -29,6 +34,7 @@ context = {
     )
 }
 
+# Instructions for the LLM to briefly answer questions about a user based on their memory (used for testing).
 qa_instructions = {
     "role": "system",
     "content": (

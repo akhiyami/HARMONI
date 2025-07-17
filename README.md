@@ -15,7 +15,7 @@ cd Context-aware_Conversation
 ```
 2. Install dependecies
 ```bash
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 ## Configuration
 ### Environment variables:

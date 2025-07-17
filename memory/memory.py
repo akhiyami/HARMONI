@@ -10,10 +10,13 @@ import os
 import json
 import sqlite3
 
+import torch
+from transformers import SiglipVisionModel, SiglipImageProcessor
+from PIL import Image
+
 import numpy as np
 
 from config import RECOGNITION_THRESHOLD
-
 
 ##########
 # Functions
@@ -89,7 +92,7 @@ def update_memory(new_memory_object, current_user, conn):
     return memory_retriever(current_user, conn)
 
 
-def user_retriever(encodings, conn):
+def user_retriever(img, conn, processor, model):
     """
     Retrieve or create a user based on face encodings.
     This function checks if the user already exists in the database based on the provided encodings.
@@ -102,26 +105,37 @@ def user_retriever(encodings, conn):
     Returns:
         tuple: A tuple containing the user ID and their memory.
     """
+    inputs = processor(images=img, return_tensors="pt")
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        embedding = outputs.pooler_output  # shape: [1, hidden_dim]
+
+    embedding = torch.nn.functional.normalize(embedding, dim=-1)
+
     if conn is None:
         raise ValueError("A database connection is required.")
-    
     cursor = conn.cursor()
 
     # Check if the user already exists based on embeddings
     cursor.execute("SELECT user_id, embeddings FROM user_embeddings WHERE embeddings IS NOT NULL")
+    embeddings_dict = {user_id: np.frombuffer(blob, dtype=np.float32) for user_id, blob in cursor.fetchall()}
 
-    # Iterate through the stored embeddings to find a match
-    for user_id, blob in cursor.fetchall():
-        stored = np.frombuffer(blob, dtype=np.float32)
-        distance = np.linalg.norm(np.array(encodings) - stored)
+    known_user_embeddings = list(embeddings_dict.values())
+    if known_user_embeddings != []:
+        known_user_embeddings = torch.stack([torch.tensor(e) for e in known_user_embeddings])
 
-        if distance < RECOGNITION_THRESHOLD:
+        cos = torch.nn.CosineSimilarity(dim=-1)
+        similarities = cos(embedding, known_user_embeddings)
+
+        best_score, best_idx = torch.max(similarities, dim=0)
+        if best_score.item() > RECOGNITION_THRESHOLD:
+            # If a user is found, return the user ID and their memory
+            user_id = list(embeddings_dict.keys())[best_idx.item()]
             try:
-                user_memory= memory_retriever(user_id, conn)
-
+                user_memory = memory_retriever(user_id, conn)
             except sqlite3.OperationalError:
                 user_memory = ""
-
             return user_id, user_memory
 
     # if no user found, create a new user
@@ -131,10 +145,10 @@ def user_retriever(encodings, conn):
     user_memory = ""
 
     # Insert the new user into the user_embeddings table
-    embeddings_blob = np.array(encodings[0], dtype=np.float32).tobytes()
+    embedding_blob = np.array(embedding, dtype=np.float32).tobytes()
     cursor.execute(
         "INSERT INTO user_embeddings (user_id, embeddings) VALUES (?, ?)",
-        (new_user_id, embeddings_blob)
+        (new_user_id, embedding_blob)
     )
 
     cursor.execute(

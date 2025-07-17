@@ -10,5 +10,5 @@ if not API_KEY:
 
 # Default configuration values
 LEN_HISTORY = 10
-RECOGNITION_THRESHOLD = 0.4  # Distance threshold for user retrieval
+RECOGNITION_THRESHOLD = 0.9  # Distance threshold for user retrieval
 NUM_TOP_FEATURES = 5 # Number of top features to retrieve for context

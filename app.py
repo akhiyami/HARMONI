@@ -20,15 +20,14 @@ from io import BytesIO
 
 import numpy as np
 from PIL import Image
+from transformers import SiglipVisionModel, SiglipImageProcessor
 
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-import face_recognition
-
 from llm.openai_utils import ask_llm
-from memory.memory import user_retriever, update_memory
+from memory.memory import user_retriever, update_memory, memory_retriever
 from config import LEN_HISTORY
 from memory.utils import create_table
 
@@ -51,6 +50,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Global variables for user session management
 current_user = None
 current_session = deque(maxlen=LEN_HISTORY)
+
+# facial encoding model
+model_name = "hamedrahimi/ULIP-p16"
+model = SiglipVisionModel.from_pretrained(model_name)
+processor = SiglipImageProcessor.from_pretrained(model_name)
+model.eval()
 
 
 ###########
@@ -105,17 +110,9 @@ async def set_user(image: UploadFile = File(...)):
 
     # Receive the image from the application
     image_bytes = await image.read()
-    img = Image.open(BytesIO(image_bytes))
-    img_array = np.array(img)
-
-    # Perform face recognition to get the encodings
-    encodings = face_recognition.face_encodings(img_array)
-    if not encodings:
-        return {"error": "No face detected in the image."}
+    img = Image.open(BytesIO(image_bytes)).convert("RGB")
     
-    # Use the first encoding for user identification
-    encodings = [encodings[0]]
-    new_user, new_memory = user_retriever(encodings, conn)
+    new_user, new_memory = user_retriever(img, conn, processor, model)
 
     if new_user != current_user :# Check if a new user was identified
 
@@ -125,3 +122,7 @@ async def set_user(image: UploadFile = File(...)):
         current_session = deque(maxlen=LEN_HISTORY)
 
         return {"user_id": current_user, "profile": user_memory}
+    
+    else:
+        memory = memory_retriever(current_user, conn)
+        return {"user_id": current_user, "profile": memory}

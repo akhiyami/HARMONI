@@ -31,6 +31,7 @@ from llm.openai_utils import ask_llm
 from memory.memory import user_retriever, update_memory
 from config import LEN_HISTORY
 from memory.utils import create_table
+from models.frustration_predictor import get_frustration_predictor
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
 
@@ -70,6 +71,7 @@ async def get_home():
 async def ask(question: str = Form(...)):
     """
     Handle the user's question, retrieve the answer from the LLM, and update the user's memory.
+    Now includes parallel frustration prediction.
     """
     global current_session, current_user, conn
 
@@ -80,15 +82,36 @@ async def ask(question: str = Form(...)):
     if not question.strip():
         return {"error": "Question cannot be empty."}
     
-    # Generate the answer using the LLM
+    # 🆕 PARALLEL FRUSTRATION PREDICTION
+    # Prepare conversation history for prediction
+    temp_history = list(current_session) + [{"role": "user", "content": question}]
+    
+    # Run frustration prediction in parallel with LLM
+    frustration_predictor = get_frustration_predictor()
+    will_be_frustrated = frustration_predictor.predict_will_be_frustrated(temp_history)
+    
+    # Generate the answer using the LLM (existing flow)
     output = ask_llm(question, current_session, conn, current_user)
     answer = output.answer
     new_memory_object = output.updated_memory
 
-    # Update the user's memory in the database
+    # 🆕 ADD FRUSTRATION PREDICTION TO MEMORY
+    from llm.openai_utils import Feature
+    
+    frustration_feature = Feature(
+        name="will_be_frustrated",
+        description="AI prediction of whether the user will be frustrated in the next interaction",
+        tags=["prediction", "emotion", "frustration"],
+        value=[str(will_be_frustrated).lower()]  # "true" or "false"
+    )
+    
+    # Add to memory updates
+    new_memory_object.append(frustration_feature)
+
+    # Update the user's memory in the database (existing flow)
     memory_user = update_memory(new_memory_object, current_user, conn)
 
-    # Update the session history
+    # Update the session history (existing flow)
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
 

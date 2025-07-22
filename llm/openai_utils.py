@@ -69,7 +69,7 @@ class Feature(BaseModel):
 # Define a Pydantic model for the answer with updated memory
 class AnswerWithMemory(BaseModel):
     answer: str
-    updated_memory: list[Feature]
+    updated_memory: List[Feature]
         
 ############
 # Function Definitions
@@ -159,7 +159,7 @@ def ask_llm(question, history, conn=None, current_user=None):
     now = time.time()
     retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
     retrival_time = time.time() - now
-    print(f"Retrieved features: {[feature["name"] for feature in retrieved_memory]}")
+    print(f"Retrieved features: {[feature['name'] for feature in retrieved_memory]}")
 
     # Prepare the long term memory context
     ltm = {

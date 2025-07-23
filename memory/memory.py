@@ -39,14 +39,15 @@ def memory_retriever(user_id, conn):
     
     # Retrieve the user's features from its table in the database
     cursor = conn.cursor()
-    cursor.execute(f"SELECT name, description, tags, value FROM {user_id}")
+    cursor.execute(f"SELECT type, name, description, tags, value FROM {user_id}")
     rows = cursor.fetchall()
 
     # Format the retrieved data into a list of dictionaries
     memory = []
     for row in rows:
-        name, description, tags, value = row
+        type, name, description, tags, value = row
         memory.append({
+            "type": type,
             "name": name,
             "description": description,
             "tags": tags.split(";") if tags else [],
@@ -70,16 +71,43 @@ def update_memory(new_memory_object, current_user, conn):
         list: The updated memory of the user.   
     """
     cursor = conn.cursor()
-    cursor.execute(f"SELECT name FROM {current_user}")
-    existing_features = cursor.fetchall()
 
-    for item in new_memory_object:
+    # Update primary features
+    cursor.execute(f"SELECT name FROM {current_user} WHERE type = 'primary'")
+    existing_primary_features = cursor.fetchall()
+    existing_primary_features = [feature[0] for feature in existing_primary_features]
+    # check if all the primary features are already in the database
+    # If not, insert them
+    for feature in ["nom", "age", "genre", "preference_dialogue"]:
+        if feature not in existing_primary_features:
+            cursor.execute(
+                f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
+                ("primary", feature, None, None, '')
+            )
+            conn.commit()
+
+    new_primary_features = [item for item in new_memory_object if item.type == "primary"]
+
+    for item in new_primary_features:
+        cursor.execute(
+            f"UPDATE {current_user} SET value = ? WHERE name = ?",
+            ((";").join(item.value), item.name)
+        )
+        conn.commit()
+
+
+    # Update contextual features
+    cursor.execute(f"SELECT name FROM {current_user} WHERE type = 'contextual'")
+    existing_features = cursor.fetchall()
+    new_features = [item for item in new_memory_object if item.type == "contextual"]
+
+    for item in new_features:
         # Check if the feature already exists based on the name
         if item.name not in [feature[0] for feature in existing_features]:  # Feature does not exist
             # Insert new feature into the user's memory
             cursor.execute(
-                f"INSERT INTO {current_user} (name, description, tags, value) VALUES (?, ?, ?, ?)",
-                (item.name, item.description, (";").join(item.tags), (";").join(item.value))
+                f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
+                (item.type, item.name, item.description, (";").join(item.tags), (";").join(item.value))
             )
             conn.commit()
         else:  # Feature exists, update it
@@ -152,7 +180,7 @@ def user_retriever(img, conn, processor, model):
     )
 
     cursor.execute(
-        f"CREATE TABLE IF NOT EXISTS {new_user_id} (name TEXT, description TEXT, tags TEXT, value TEXT, embeddings BLOB)"
+        f"CREATE TABLE IF NOT EXISTS {new_user_id} (type TEXT, name TEXT, description TEXT, tags TEXT, value TEXT, embeddings BLOB)"
     )
 
     conn.commit()

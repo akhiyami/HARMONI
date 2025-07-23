@@ -10,19 +10,21 @@ It also handles the retrieval of relevant features from the user's memory.
 ############
 
 import json
-import re
 import time
 from collections import deque
+import sys
+import os
 
 import numpy as np
 from openai import OpenAI
-import openai
-from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Optional
+
+root_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(root_folder_path)
 
 from config import API_KEY, LEN_HISTORY, NUM_TOP_FEATURES
+from memory.models import AnswerWithMemory
 from llm.prompts import context, qa_instructions
 
 ##########
@@ -30,47 +32,6 @@ from llm.prompts import context, qa_instructions
 # Initialize OpenAI client and RAG model
 client = OpenAI(api_key=API_KEY)
 rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
-
-
-###########
-# Type Definitions
-###########
-
-TagsListType = List[str]
-ValueListType = List[str]
-
-# Define a Pydantic model for the feature structure
-class Feature(BaseModel):
-    name: str = Field(
-        ..., 
-        pattern=r"^\w+$", 
-        description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: nom, âge, hobby...)."
-    )
-    description: str = Field(
-        ..., 
-        description="Description de la caractéristique, pour donner plus de contexte et de détails sur ce qu'elle représente."
-    )
-    tags: TagsListType = Field(
-        ..., 
-        description="Liste de mots-clés associés à la caractéristique, pour faciliter la recherche et le filtrage. Doit contenir entre 1 et 3 mots-clés.",
-        min_items=1,
-        max_items=3
-    )
-    value: ValueListType = Field(
-        ..., 
-        description="Liste de valeurs associées à la caractéristique, pour représenter les différentes facettes ou aspects de cette caractéristique.",
-        min_items=1
-    )
-    embeddings: Optional[List[float]] = Field(
-        None, 
-        description="Représentation vectorielle de la caractéristique, utilisée pour la recherche sémantique et la similarité. Elle sera générée automatiquement plus tard."
-    )
-
-# Define a Pydantic model for the answer with updated memory
-class AnswerWithMemory(BaseModel):
-    answer: str
-    updated_memory: list[Feature]
-        
 
 ############
 # Function Definitions
@@ -80,12 +41,29 @@ def features_retriever(question, conn, user_id):
     """
     Retrieve relevant features from the memory based on the question.
     """
+    memory = []
+
+    # Add the primary features to the memory
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT name, value FROM {user_id} WHERE type = 'primary'")
+    rows = cursor.fetchall()
+    for row in rows:
+        name, value = row
+        feature = {
+            "type": "primary",
+            "name": name,
+            "description": None,
+            "tags": None,
+            "value": value.split(";") if value else []
+        }
+        memory.append(feature)
+
+
     # Convert the question into embeddings
     question_embeddings = rag_model.encode(question, convert_to_tensor=True).cpu().numpy()  
 
     #Update embeddings for features that do not have them
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT rowid, tags, embeddings FROM {user_id}")
+    cursor.execute(f"SELECT rowid, tags, embeddings FROM {user_id} WHERE type = 'contextual'")
     rows = cursor.fetchall()
     cosine_similarities = {}
     for row in rows:
@@ -126,10 +104,10 @@ def features_retriever(question, conn, user_id):
             rows = []
 
     # Format the retrieved data into a list of Feature objects
-    memory = []
     for row in rows:
         name, description, tags, value = row
         feature = {
+            "type": "contextual",  
             "name": name,
             "description": description,
             "tags": tags.split(";") if tags else [],

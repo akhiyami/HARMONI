@@ -100,9 +100,23 @@
             if (!data.profile) {
                 live_profile.innerHTML = "";
             } else {
-                live_profile.innerHTML = data.profile.map(
-                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</em></span>`
-                ).join('<br>');
+                // Separate primary and contextual items
+                const primary = data.profile.filter(item => item.type === "primary");
+                const contextual = data.profile.filter(item => item.type === "contextual");
+
+                let html = "";
+                if (primary.length > 0) {
+                    html += primary.map(
+                        item => `<b>${item.name}:</b> </br>${item.value}`
+                    ).join('<br>');
+                }
+                if (contextual.length > 0) {
+                    if (primary.length > 0) html += "<br>----------<br>";
+                    html += contextual.map(
+                        item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                    ).join('<br>');
+                }
+                live_profile.innerHTML = html;
             }
             
         });
@@ -143,9 +157,22 @@
                         if (!data.profile) {
                             live_profile.innerHTML = "";
                         } else {
-                            live_profile.innerHTML = data.profile.map(
-                                item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
-                            ).join('<br>');
+                            const primary = data.profile.filter(item => item.type === "primary");
+                            const contextual = data.profile.filter(item => item.type === "contextual");
+
+                            let html = "";
+                            if (primary.length > 0) {
+                                html += primary.map(
+                                    item => `<b>${item.name}:</b> </br>${item.value}`
+                                ).join('<br>');
+                            }
+                            if (contextual.length > 0) {
+                                if (primary.length > 0) html += "<br>----------<br>";
+                                html += contextual.map(
+                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                ).join('<br>');
+                            }
+                            live_profile.innerHTML = html;
                         }
                         
                     })

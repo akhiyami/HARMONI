@@ -6,6 +6,7 @@ conversation/static/users_images
 test.ipynb
 inference.ipynb
 results/
+tests.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

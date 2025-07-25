@@ -1,7 +1,7 @@
-from transformers import PaliGemmaProcessor, PaliGemmaForConditionalGeneration
 import torch
-
-from transformers.image_utils import load_image
+from PIL import Image
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 
 def generate_description(image, model, processor):
@@ -15,14 +15,24 @@ def generate_description(image, model, processor):
         decoded = processor.decode(generation, skip_special_tokens=True)
         return decoded
 
-if __name__ == "__main__":
-    device = 'mps' if torch.backends.mps.is_available() else 'cpu'
-    model_id = "ACIDE/User-VLM-10B-base"
-    processor = PaliGemmaProcessor.from_pretrained(model_id)
-    model = PaliGemmaForConditionalGeneration.from_pretrained(model_id, torch_dtype=torch.bfloat16).to(device)
+def prob_emotions(image, model, processor):
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image).convert("RGB")
+    elif not isinstance(image, Image.Image):
+        raise TypeError("Input must be a NumPy array or PIL.Image")
+    
+    inputs = processor(images=image, return_tensors="pt")
+    with torch.inference_mode():
+        outputs = model(**inputs)
+        logits = outputs.logits
+        return logits.softmax(dim=1).detach().cpu().numpy()
+    
+def detect_emotions(imgs, model, processor):
+    with ThreadPoolExecutor() as executor:
+        probs_list = list(executor.map(lambda img: prob_emotions(img, model, processor), imgs))
+    probs_list = np.array(probs_list)
 
-    url = "https://media.istockphoto.com/id/1403196779/fr/photo/une-joyeuse-famille-m%C3%A9tisse-de-trois-personnes-se-relaxant-dans-le-salon-et-jouant-ensemble.webp?s=2048x2048&w=is&k=20&c=vNqwOIBiOXOTaapic91TOZiOSpnqFymTiT99b4Vgb4c="
-    image = load_image(url)
-
-    description = generate_description(image, model, processor)
-    print(description)
+    emotions = ['sad', 'disgust', 'angry', 'neutral', 'fear', 'surprise', 'happy']
+    emotion_probs = np.mean(probs_list, axis=0)
+    emotion_index = np.argmax(emotion_probs)
+    return emotions[emotion_index], emotion_probs[0][emotion_index]

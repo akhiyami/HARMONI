@@ -13,14 +13,19 @@ import matplotlib.pyplot as plt
 import whisper
 from concurrent.futures import ThreadPoolExecutor
 from transformers import PaliGemmaProcessor, PaliGemmaForConditionalGeneration
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+from dotenv import load_dotenv
 
 from vision import recognize_face, get_lips_landmarks
 from post_processing import remove_outliers, stitch_sequences, compute_speaking_probability
 from audio import transcribe_audio, extract_audio
-from emotions import generate_description
+from emotions import generate_description, detect_emotions
+
+load_dotenv()
+HF_TOKEN = os.getenv('HF_TOKEN')
 
 # Define the name of the video to process
-name_video = 'sample8'  # Change this to your video name without extension
+name_video = 'sample4'  # Change this to your video name without extension
 
 #empty result folder if exists
 output_dir = 'results'
@@ -48,9 +53,13 @@ cap = cv2.VideoCapture(input_path)
 
 # Model for image description
 device = 'mps' if torch.backends.mps.is_available() else 'cpu'
-model_id = "ACIDE/User-VLM-10B-base"
-description_processor = PaliGemmaProcessor.from_pretrained(model_id)
-description_model = PaliGemmaForConditionalGeneration.from_pretrained(model_id, torch_dtype=torch.bfloat16).to(device)
+# model_id = "ACIDE/User-VLM-10B-base"
+# description_processor = PaliGemmaProcessor.from_pretrained(model_id)
+# description_model = PaliGemmaForConditionalGeneration.from_pretrained(model_id, torch_dtype=torch.bfloat16).to(device)
+
+# Model for emotion detection
+emotion_processor = AutoImageProcessor.from_pretrained("dima806/facial_emotions_image_detection")
+emotion_model = AutoModelForImageClassification.from_pretrained("dima806/facial_emotions_image_detection")
 
 # Process frames
 def detect_speaking_face(cap):
@@ -178,14 +187,20 @@ if __name__ == "__main__":
         speaking_face_row = future_face.result()
         transcript = future_transcript.result()
 
-    #pick last frame of speaking face row
-    last_frame = speaking_face_row[-1]
+    #pick 10 frames equally spaced
+    if len(speaking_face_row) > 10:
+        speaking_face_row_array = np.array(speaking_face_row, dtype=object)
+        sample_speaking_face_row = speaking_face_row_array[np.linspace(0, len(speaking_face_row_array) - 1, 10, dtype=int)].tolist()
+    else:
+        sample_speaking_face_row = speaking_face_row
+    
 
     import time
     start_time = time.time()
-    description = generate_description(last_frame, description_model, description_processor)
+    emotion, prob = detect_emotions(speaking_face_row, emotion_model, emotion_processor)
     end_time = time.time()
-    print(f"Description generated in {end_time - start_time:.2f} seconds")
+    print(f"Emotion generated in {end_time - start_time:.2f} seconds")
+    print(f"Detected emotion: {emotion} with probability: {prob}")
 
     # Printing and plotting
     n_frames = len(speaking_face_row)
@@ -198,7 +213,7 @@ if __name__ == "__main__":
         ax.axis('off')
 
     plt.suptitle(f'"{transcript}"', fontsize=16)
-    plt.figtext(0.5, 0.01, f"Description: {description}", wrap=True, horizontalalignment='center', fontsize=12)
+    plt.figtext(0.5, 0.01, f"Emotion: {emotion}", wrap=True, horizontalalignment='center', fontsize=12)
 
     plt.tight_layout()
 

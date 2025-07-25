@@ -1,12 +1,11 @@
 ### Git ignore file for Python projects
 
 # Projet-specific files
-users.json
 users.db
-/data
-/static/users_images
+conversation/static/users_images
 test.ipynb
 inference.ipynb
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

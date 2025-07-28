@@ -1,26 +1,28 @@
 import cv2
-import os
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from PIL import Image
 import sqlite3
 import time
 import threading
 from collections import deque
+import matplotlib.pyplot as plt
+import os
 
-from vision_module.config import models as vision_models
-from vision_module.vision import detect_speaking_face
-from vision_module.audio import extract_and_transcribe_audio
-from vision_module.emotions import detect_emotions
+from vision.config import models as vision_models
+from vision.detection import detect_speaking_face
+from vision.audio import extract_and_transcribe_audio
+from vision.emotions import detect_emotions
 
-from conversation_module.memory.memory import user_retriever, update_memory
-from conversation_module.llm.openai_utils import generate_answer, update_memory_llm
-from conversation_module.memory.utils import create_table
-from conversation_module.config import models as conversation_models
-from conversation_module.config.settings import LEN_HISTORY
+from conversation.memory.memory import user_retriever, update_memory
+from conversation.llm.openai_utils import generate_answer, update_memory_llm
+from conversation.memory.utils import create_table
+from conversation.config import models as conversation_models
+from conversation.config.settings import LEN_HISTORY
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Define the name of the video to process
-name_video = 'vision_module/videos/sample4'  # Change this to your video name without extension
+name_video = 'vision_module/videos/sample9'  # Change this to your video name without extension
 
 # Load models from vision module
 model = vision_models.YOLO_FACE_MODEL
@@ -92,9 +94,33 @@ if __name__ == "__main__":
     memory_thread = threading.Thread(target=update_user_memory)
     memory_thread.start()
 
+    visual_profile = {
+        "emotion": emotion,
+        "gender": None,
+        "age": None,
+    }
+
+    context = "Tu viens de faire semblant de bugger pour éviter de répondre à une question embarassante"
+
     # Generate the answer using the LLM
-    answer = generate_answer(question, current_session, conn, current_user)
+    answer = generate_answer(question, current_session, context, conn, current_user, visual_profile)
     memory_thread.join()
 
     print(f"Answer generated: {answer}")
 
+    # Printing and plotting
+    n_frames = len(speaking_face_row)
+    fig, axes = plt.subplots(1, n_frames, figsize=(n_frames * 2, 2), constrained_layout=True)
+
+    # Plot each frame
+    for j in range(n_frames):
+        ax = axes[j]
+        ax.imshow(speaking_face_row[j])
+        ax.axis('off')
+
+    plt.suptitle(f'"{transcript}"', fontsize=16)
+    plt.figtext(0.5, 0.01, f"Emotion: {emotion}", wrap=True, horizontalalignment='center', fontsize=12)
+
+    plt.tight_layout()
+
+    plt.show()

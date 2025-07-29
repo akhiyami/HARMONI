@@ -4,9 +4,10 @@
 users.db
 conversation/static/users_images
 test.ipynb
-inference.ipynb
+conversation/inference.ipynb
 results/
 tests.ipynb
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

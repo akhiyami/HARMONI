@@ -22,7 +22,7 @@ from conversation.config.settings import LEN_HISTORY
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Define the name of the video to process
-name_video = 'vision_module/videos/sample9'  # Change this to your video name without extension
+name_video = 'data/20250728_123821'  # Change this to your video name without extension
 
 # Load models from vision module
 model = vision_models.YOLO_FACE_MODEL
@@ -51,7 +51,7 @@ if __name__ == "__main__":
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, f'{name_video}.mp4', whisper_model)
 
-        speaking_face_row = future_face.result()
+        speaking_face_row, _, _ = future_face.result()
         transcript = future_transcript.result()
 
     user_image =  speaking_face_row[0]
@@ -68,9 +68,8 @@ if __name__ == "__main__":
         future_emotion = executor.submit(detect_emotions, sample_speaking_face_row, emotion_model, emotion_processor)
         future_user = executor.submit(user_retriever, user_image, None, user_retriever_processor, user_retriever_model, database)
 
-        emotion, prob = future_emotion.result()
+        emotion, prob, _, _ = future_emotion.result()
         detected_user, memory_user = future_user.result()
-
 
     question = transcript
     current_session = deque(maxlen=LEN_HISTORY)

@@ -21,7 +21,7 @@ YOLO_FACE_MODEL = YOLO(
 
 # Load dlib landmark detector
 LANDMARK_DETECTOR = dlib.shape_predictor(
-    os.path.join('vision_module/models', 'shape_predictor_68_face_landmarks.dat') 
+    os.path.join('vision/models', 'shape_predictor_68_face_landmarks.dat') 
 )
 
 # Load Whisper model

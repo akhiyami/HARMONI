@@ -119,8 +119,9 @@ def center_landmarks(landmarks):
     centered_landmarks = landmarks - [landmark_3[0], 0]
     return centered_landmarks
 
+# speaking face detection 
 
-def detect_speaking_face(cap, model, landmark_detector, save_frames=False):
+def detect_speaking_face(cap, model, landmark_detector, save_frames=False, verbose=True):
     """
     Detect speaking faces in a video stream using YOLOv8 and Dlib.
     Args:
@@ -131,83 +132,111 @@ def detect_speaking_face(cap, model, landmark_detector, save_frames=False):
     Returns:
         list: List of detected speaking faces.
     """
-    frames_stack = []
-    current_faces = []
-    face_images = []
+    frames_stack, current_faces, face_images = [], [], []
     i = 0
 
-    while True: # Read frames from the video
+    while True:  # Read frames from the video
         ret, frame = cap.read()
         if not ret:
             break
 
-        if i % FRAME_STRIDE == 0: # Process every FRAME_STRIDE-th frame (for computation efficiency)
+        if i % FRAME_STRIDE == 0:  # Process every FRAME_STRIDE-th frame (for computation efficiency)
+            frames_stack.append({})  # Storage for detected faces
+            process_detections(frame, model, current_faces, face_images, frames_stack, i)
 
-            # Storage for detected faces 
-            frames_stack.append({}) 
-
-            # Run YOLO inference
-            output = model(frame)
-            results = Detections.from_ultralytics(output[0])
-
-            updated_idx = [None] * len(current_faces)
-
-            # Check or the detected faces if they are already known
-            for detection in results:
-                know_face = recognize_face(current_faces, detection[0], frame) # recognize_face function returns the index of the known face or None if not recognized
-                if know_face is not None:
-                    # If the face is recognized, update the existing face buffer with the new frame, and indicate that this face has been updated
-                    current_faces[know_face].append(detection[0])
-                    updated_idx[know_face] = True
-
-                    # Extract the face image and convert it to RGB
-                    x1, y1, x2, y2 = detection[0]
-                    img_rgb = Image.fromarray(cv2.cvtColor(frame[int(y1):int(y2), int(x1):int(x2)], cv2.COLOR_BGR2RGB))
-                    face_images[know_face] = img_rgb
-
-                    # Update the frames stack with the known face, and the associated index corresponding to the identified face
-                    frames_stack[i // FRAME_STRIDE].update({know_face: img_rgb})
-
-                else: # If the face is not recognized, create a new face buffer 
-
-                    faces = deque(maxlen=LEN_FRAME_BUFFER)
-                    faces.append(detection[0])
-                    current_faces.append(faces)
-
-                    # Add the new face to the face images list
-                    x1, y1, x2, y2 = detection[0]
-                    img_rgb = Image.fromarray(cv2.cvtColor(frame[int(y1):int(y2), int(x1):int(x2)], cv2.COLOR_BGR2RGB))
-                    face_images.append(img_rgb)
-
-                    # Update the frames stack with the new face and its index
-                    frames_stack[i // FRAME_STRIDE].update({len(face_images) - 1: img_rgb})
-
-            # Remove faces that have not been updated for a while (we assume that the identified face has left the scene)
-            nn_idx = [k for k, updated in enumerate(updated_idx) if updated is None] # Get the indices of the faces that have not been updated this frame
-            for idx in nn_idx:
-                if current_faces[idx] is None: # this face has already been removed
-                    continue
-
-                current_faces[idx].append(None)  # Append None to the deque to indicate that this face has not been detected in this frame
-                if sum(face is None for face in current_faces[idx]) == LEN_FRAME_BUFFER: # If the face has not been detected for LEN_FRAME_BUFFER frames, remove it
-                    current_faces[idx] = None
-                    face_images[idx] = Image.fromarray(np.zeros(face_images[idx].size, dtype=np.uint8))
         i += 1
 
     # Release the video capture object
     cap.release()
 
-    # Process the frames stack to create a grid of faces (each row corresponds to a frame and each column to a face))
+    # Process the frames stack to create a grid of faces (each row corresponds to a frame and each column to a face)
+    face_grid, sparsity, lips_landmarks_grid = build_face_grids(frames_stack, landmark_detector)
+
+    # Post-process the grids to remove outliers and stitch sequences
+    face_grid, sparsity, lips_landmarks_grid = remove_outliers(face_grid, sparsity, lips_landmarks_grid)
+    face_grid, sparsity, lips_landmarks_grid = stitch_sequences(face_grid, sparsity, lips_landmarks_grid)
+
+    # Process the face grid to compute the speaking probability for each face
+    speaking_user, speaking_probs = identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames, verbose)
+
+    # Extract and return speaking face row
+    face_row = face_grid[:, speaking_user]
+    sparsity_row = sparsity[:, speaking_user]
+
+    return [face for face, sparse in zip(face_row, sparsity_row) if sparse], face_grid, speaking_probs
+
+def process_detections(frame, model, current_faces, face_images, frames_stack, i):
+    """
+    Process the detections from the YOLO model and update the current faces and frames stack.
+    Args:
+        frame (numpy.ndarray): Current video frame.
+        model: YOLOv8 model for face detection.
+        current_faces (list): List of current faces being tracked.
+        face_images (list): List of images corresponding to the current faces.
+        frames_stack (list): List of frames with detected faces.
+        i (int): Current frame index.
+    """
+
+    # Run YOLO inference
+    output = model(frame)
+    results = Detections.from_ultralytics(output[0])
+    updated_idx = [None] * len(current_faces)
+
+    for detection in results:
+        bbox = detection[0]
+        known_face_idx = recognize_face(current_faces, bbox)  # recognize_face function returns index or None
+        x1, y1, x2, y2 = map(int, bbox)
+        img_rgb = Image.fromarray(cv2.cvtColor(frame[y1:y2, x1:x2], cv2.COLOR_BGR2RGB))
+
+        if known_face_idx is not None:
+            # If the face is recognized, update the existing face buffer with the new frame
+            current_faces[known_face_idx].append(bbox)
+            updated_idx[known_face_idx] = True
+            face_images[known_face_idx] = img_rgb
+            frames_stack[i // FRAME_STRIDE][known_face_idx] = img_rgb  # Update frame stack
+
+        else:
+            # If the face is not recognized, create a new face buffer
+            faces = deque(maxlen=LEN_FRAME_BUFFER)
+            faces.append(bbox)
+            current_faces.append(faces)
+            face_images.append(img_rgb)
+            frames_stack[i // FRAME_STRIDE][len(face_images) - 1] = img_rgb  # Update frame stack
+
+    # Remove faces that have not been updated for a while (we assume they have left the scene)
+    remove_stale_faces(current_faces, face_images, updated_idx)
+
+
+def remove_stale_faces(current_faces, face_images, updated_idx):
+    """
+    Remove faces that have not been updated for a while.
+    """
+    # Get the indices of the faces that have not been updated this frame
+    nn_idx = [k for k, updated in enumerate(updated_idx) if updated is None]
+    for idx in nn_idx:
+        if current_faces[idx] is None:
+            continue
+        current_faces[idx].append(None)  # Indicate this face has not been detected
+        if sum(face is None for face in current_faces[idx]) == LEN_FRAME_BUFFER:
+            # If face not seen for LEN_FRAME_BUFFER frames, remove it
+            current_faces[idx] = None
+            face_images[idx] = Image.fromarray(np.zeros(face_images[idx].size, dtype=np.uint8))
+
+
+def build_face_grids(frames_stack, landmark_detector):
+    """
+    Build grids of face images, sparsity information, and lips landmarks from the frames stack.
+    """
+    # Define three different grids to store the face images, sparsity info, and lips landmarks
     keys = np.unique([k for frames in frames_stack if frames for k in frames.keys()])
     n_faces = len(keys)
     n_frames = len(frames_stack)
 
-    # define three different grids to store the face images, sparsity information, and lips landmarks
     face_grid = np.zeros((n_frames, n_faces), dtype=object)
-    sparsity = np.zeros((n_frames, n_faces), dtype=bool) # boolean array to indicate if the face has been detected in the frame
+    sparsity = np.zeros((n_frames, n_faces), dtype=bool)  # Indicates if face is detected in a frame
     lips_landmarks_grid = np.zeros((n_frames, n_faces), dtype=object)
 
-    # Fill the grids with the face images, sparsity information, and lips landmarks
+    # Fill the grids
     for i, frames in enumerate(frames_stack):
         for j, key in enumerate(keys):
             if key in frames:
@@ -217,48 +246,49 @@ def detect_speaking_face(cap, model, landmark_detector, save_frames=False):
             else:
                 face_grid[i, j] = Image.fromarray(np.zeros((100, 100, 3), dtype=np.uint8))
 
-    # Post-process the grids to remove outliers and stitch sequences
-    face_grid, sparsity, lips_landmarks_grid = remove_outliers(face_grid, sparsity, lips_landmarks_grid)
-    face_grid, sparsity, lips_landmarks_grid = stitch_sequences(face_grid, sparsity, lips_landmarks_grid)
-
-    # Save the frames if required
-    if save_frames:
-        output_dir = 'results'
-        os.makedirs(output_dir, exist_ok=True)
+    return face_grid, sparsity, lips_landmarks_grid
 
 
-    # Process the face grid to compute the speaking probability for each face
-    best_prob = 0
-    speaking_user = -1
+def identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames, verbose=True):
+    """
+    Identify the speaking face based on the computed speaking probabilities.
+    Args:
+        face_grid (numpy.ndarray): Grid of face images.
+        sparsity (numpy.ndarray): Grid indicating if a face is detected in a frame.
+        lips_landmarks_grid (numpy.ndarray): Grid of lips landmarks.
+        save_frames (bool): Whether to save frames with detected faces.
+        verbose (bool): Whether to print detailed logs.
+    Returns:
+        int: Index of the speaking face.
+        list: List of speaking probabilities for each face.
+    """
+    probs = []
+
     for i in range(face_grid.shape[1]):
         face_row = face_grid[:, i]
         sparsity_row = sparsity[:, i]
-        lips_landmarks_row = lips_landmarks_grid[:, i]
+        lips_row = lips_landmarks_grid[:, i]
 
-        face_row = [face for face, sparse in zip(face_row, sparsity_row) if sparse]
-        lips_landmarks_row = [landmark for landmark, sparse in zip(lips_landmarks_row, sparsity_row) if sparse]
-        
+        # Keep only frames where face is detected
+        valid_faces = [f for f, s in zip(face_row, sparsity_row) if s]
+        valid_lips = [l for l, s in zip(lips_row, sparsity_row) if s]
+
         if save_frames:
-            subfolder_path = os.path.join(output_dir, f"{i}")
+            subfolder_path = os.path.join("results", f"{i}")
             os.makedirs(subfolder_path, exist_ok=True)
-
-            for j in range(len(face_row)):
-                img = face_row[j]
+            for j, img in enumerate(valid_faces):
                 img.save(os.path.join(subfolder_path, f'frame_{j:04d}.png'))
 
-        probs = compute_speaking_probability(lips_landmarks_row)
-        mean_prob = np.mean(probs)
-        if mean_prob > best_prob:
-            best_prob = mean_prob
-            speaking_user = i
-        print(f"Face {i}: Mean speaking probability = {mean_prob:.2f}")
-    
-    print("\nProcessing complete. Results saved in 'results' folder.")
-    print(f"The speaker is the person number {speaking_user}")
+        prob_face = compute_speaking_probability(valid_lips)
+        mean_prob = np.mean(prob_face)
+        if verbose:
+            print(f"Face {i}: Mean speaking probability = {mean_prob:.2f}")
 
-    # Extract and return speaking face row
-    speaking_face_row = face_grid[:, speaking_user]
-    speaking_sparsity_row = sparsity[:, speaking_user]
-    speaking_face_row = [face for face, sparse in zip(speaking_face_row, speaking_sparsity_row) if sparse]
-    
-    return speaking_face_row
+        probs.append(mean_prob)
+
+    speaking_user = np.argmax(probs)
+    if verbose:
+        print("\nProcessing complete. Results saved in 'results' folder.")
+        print(f"The speaker is the person number {speaking_user}, with a speaking probability of {probs[speaking_user]:.2f}.")
+
+    return speaking_user, probs

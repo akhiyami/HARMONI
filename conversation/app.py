@@ -29,24 +29,24 @@ from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from llm.openai_utils import generate_answer, update_memory_llm
-from memory.memory import user_retriever, update_memory, memory_retriever
-from config.settings import LEN_HISTORY
-from config import models
-from memory.utils import create_table
+from conversation.llm.openai_utils import generate_answer, update_memory_llm
+from conversation.memory.memory import user_retriever, update_memory, memory_retriever
+from conversation.config.settings import LEN_HISTORY
+from conversation.config import models
+from conversation.memory.utils import create_table
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
 
 #--------------------------------------- Configuration ---------------------------------------#
 
 # Database connection
-database = 'memory/users.db'
+database = 'conversation/memory/users.db'
 conn = sqlite3.connect(database)
 create_table(conn)      # Create the embeddings table if it does not exist
 
 # Init FastAPI app
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="conversation/static"), name="static")
 
 # Global variables for user session management
 current_user = None
@@ -64,7 +64,7 @@ async def get_home():
     """
     Serve the main HTML page for the application.
     """
-    with open("static/index.html", "r") as f:
+    with open("conversation/static/index.html", "r") as f:
         return f.read()
 
 

@@ -188,7 +188,6 @@ def user_retriever(img, conn, processor, model, database=None):
     cursor.execute("SELECT COUNT(*) FROM user_embeddings")
     user_number = cursor.fetchone()[0] + 1
     new_user_id = f"user{user_number}"
-    user_memory = ""
 
     # Insert the new user into the user_embeddings table
     embedding_blob = np.array(embedding, dtype=np.float32).tobytes()
@@ -207,6 +206,8 @@ def user_retriever(img, conn, processor, model, database=None):
             f"INSERT INTO {new_user_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
             ("primary", feature, None, None, ''),
         )
+
+    user_memory = memory_retriever(new_user_id, conn)
 
     conn.commit()
     if new_conn:

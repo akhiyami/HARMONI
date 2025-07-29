@@ -35,4 +35,4 @@ def detect_emotions(imgs, model, processor):
     emotions = ['sad', 'disgust', 'angry', 'neutral', 'fear', 'surprise', 'happy']
     emotion_probs = np.mean(probs_list, axis=0)
     emotion_index = np.argmax(emotion_probs)
-    return emotions[emotion_index], emotion_probs[0][emotion_index]
+    return emotions[emotion_index], emotion_probs[0][emotion_index], emotions, emotion_probs[0].tolist()

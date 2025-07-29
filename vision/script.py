@@ -47,7 +47,7 @@ if __name__ == "__main__":
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, f'videos/{name_video}.mp4', whisper_model)
 
-        speaking_face_row = future_face.result()
+        speaking_face_row, _, _ = future_face.result()
         transcript = future_transcript.result()
 
     #pick 10 frames equally spaced
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     import time
     start_time = time.time()
-    emotion, prob = detect_emotions(speaking_face_row, emotion_model, emotion_processor)
+    emotion, prob, _, _ = detect_emotions(speaking_face_row, emotion_model, emotion_processor)
     end_time = time.time()
     print(f"Emotion generated in {end_time - start_time:.2f} seconds")
     print(f"Detected emotion: {emotion} with probability: {prob}")

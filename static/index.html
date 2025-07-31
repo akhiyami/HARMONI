@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <!-- Input video section -->
+    <div id="user_container">
+
+        <!-- Video and selection button -->
+        <div id="video_container">
+            <div id="video_placeholder" class="video-box">
+                <img src="static/video_pholder.png" alt="Aperçu de la vidéo d'entrée">
+            </div>
+            <video id="video_preview" src="" alt="Vidéo de l'utilisateur actif" controls></video>
+
+            <div class="change_video">
+                <label for="videoInput" class="user-label">
+                    Change video
+                    <input type="file" id="videoInput" accept="video/*" onchange="handleVideoSelect(event)">
+                </label>
+            </div>
+        </div>
+        
+        <!-- User profile (live updated) -->
+        <div id="user_box">
+            <div id="user">
+                <img id="user_placeholder" src="static/user_pholder.png" alt="Aperçu de l'utilisateur actif">
+                <img id="user_preview" src="" alt="Aperçu de l'utilisateur actif" style="display:none;">
+                <span id="user_label"></span>
+            </div>
+            <div id="profile">
+                <span id="profile_label">A propos :</span><br><br>
+                <span id="live_profile"></span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Conversation session -->
+    <div id="chatbox"></div>
+
+
+    <!-- Script for dynamic behavior -->
+    <script>
+        //dynamic style
+        const video = document.getElementById("video_container");
+        const profile = document.getElementById("profile");
+        profile.style.height = `${video.offsetHeight}px`;
+
+        //constants
+        const chatbox = document.getElementById("chatbox");
+        const live_profile = document.getElementById("live_profile");
+        const user_label = document.getElementById("user_label");
+        
+        //global variables
+        let userId = ""; // Default user ID
+
+        // Function to handle new video selection
+        function handleVideoSelect(event) {
+            const file = event.target.files[0];
+            const preview = document.getElementById('video_preview');
+            const videoPlaceholder = document.getElementById('video_placeholder');
+            const userPreview = document.getElementById('user_preview');
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'inline';
+                    videoPlaceholder.style.display = 'none';    
+                };
+                reader.readAsDataURL(file);
+                // Send the video file to the server
+                const formData = new FormData();
+                formData.append('video', file); 
+                fetch('/set_video', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    addMessage(data.detected_user, data.transcript, "user");
+                    
+                    // update detected user
+                    user_label.textContent = data.detected_user;
+                    // update the picture
+                    if (data.user_image) {
+                        userPreview.src = "data:image/png;base64," + data.user_image;
+                        userPreview.style.display = 'inline';
+                        document.getElementById('user_placeholder').style.display = 'none';
+                    } else {
+                        userPreview.style.display = 'none';
+                        document.getElementById('user_placeholder').style.display = 'inline';
+                    }
+
+                    // Update profile
+                    if (!data.profile) {
+                            live_profile.innerHTML = "";
+                        } else {
+                            const primary = data.profile.filter(item => item.type === "primary");
+                            const contextual = data.profile.filter(item => item.type === "contextual");
+
+                            let html = "";
+                            if (primary.length > 0) {
+                                html += primary.map(
+                                    item => `<b>${item.name}:</b> </br>${item.value}`
+                                ).join('<br>');
+                            }
+                            if (contextual.length > 0) {
+                                if (primary.length > 0) html += "<br>----------<br>";
+                                html += contextual.map(
+                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                ).join('<br>');
+                            }
+                            live_profile.innerHTML = html;
+                        }   
+                        
+                    // post emotion and memory and question to an other route
+                    const formDataAnswer = new FormData();
+                    formDataAnswer.append('emotion', data.emotion);
+                    formDataAnswer.append('current_user', data.detected_user);
+                    formDataAnswer.append('question', data.transcript);
+                    fetch('/answer', {
+                        method: 'POST',
+                        body: formDataAnswer
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.answer) {
+                            addMessage("Assistant", data.answer, "bot");
+                        } else {
+                            addMessage("Assistant", "Aucune réponse disponible pour cette question.", "system");
+                        }
+                        if (!data.profile) {
+                            live_profile.innerHTML = "";
+                        } else {
+                            const primary = data.profile.filter(item => item.type === "primary");
+                            const contextual = data.profile.filter(item => item.type === "contextual");
+
+                            let html = "";
+                            if (primary.length > 0) {
+                                html += primary.map(
+                                    item => `<b>${item.name}:</b> </br>${item.value}`
+                                ).join('<br>');
+                            }
+                            if (contextual.length > 0) {
+                                if (primary.length > 0) html += "<br>----------<br>";
+                                html += contextual.map(
+                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                ).join('<br>');
+                            }
+                            live_profile.innerHTML = html;
+                        }   
+                    });
+                });
+
+            } else {
+                preview.src = '';
+                preview.style.display = 'none';
+                videoPlaceholder.style.display = 'inline';
+                addMessage("Change video", "Aucune vidéo sélectionnée", "system");
+            }
+        }   
+
+        // Function to add a message to the chatbox
+        function addMessage(sender, text, role) {
+            const div = document.createElement("div");
+            div.className = `msg ${role}`;
+            div.textContent = `${sender}: ${text}`;
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+       
+    </script>
+
+</body>
+
+</html>

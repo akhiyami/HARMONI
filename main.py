@@ -7,6 +7,7 @@ import threading
 from collections import deque
 import matplotlib.pyplot as plt
 import os
+import webbrowser
 
 from vision.config import models as vision_models
 from vision.detection import detect_speaking_face
@@ -19,10 +20,19 @@ from conversation.memory.utils import create_table
 from conversation.config import models as conversation_models
 from conversation.config.settings import LEN_HISTORY
 
+import utils 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# Choose if we save a html file with the results
+SAVE_HTML = True
+if SAVE_HTML:
+    html_blocks = []
 
 # Define the name of the video to process
 name_video = 'data/20250728_123821'  # Change this to your video name without extension
+
+if SAVE_HTML:
+    html_blocks.append(utils.display_video(f"{name_video}.mp4", jupyter=False))
 
 # Load models from vision module
 model = vision_models.YOLO_FACE_MODEL
@@ -51,8 +61,11 @@ if __name__ == "__main__":
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, f'{name_video}.mp4', whisper_model)
 
-        speaking_face_row, _, _ = future_face.result()
+        speaking_face_row, grid, probs = future_face.result()
         transcript = future_transcript.result()
+
+    if SAVE_HTML:
+        html_blocks.append(utils.display_image_grid_html(grid, probs, np.argmax(probs), jupyter=False))
 
     user_image =  speaking_face_row[0]
 
@@ -68,9 +81,15 @@ if __name__ == "__main__":
         future_emotion = executor.submit(detect_emotions, sample_speaking_face_row, emotion_model, emotion_processor)
         future_user = executor.submit(user_retriever, user_image, None, user_retriever_processor, user_retriever_model, database)
 
-        emotion, prob, _, _ = future_emotion.result()
+        emotion, prob, emotions, probs = future_emotion.result()
         detected_user, memory_user = future_user.result()
 
+    if SAVE_HTML:
+        user_image = np.array(user_image)
+        html_blocks.append(utils.user_memory_to_html(memory_user, user_image, f"Detected User: {detected_user}", jupyter=False))
+        html_blocks.append(utils.display_pie_chart(emotions, probs, emotion, prob, jupyter=False))
+        html_blocks.append(utils.display_sequence_with_transcription(speaking_face_row, transcript, jupyter=False))
+    
     question = transcript
     current_session = deque(maxlen=LEN_HISTORY)
     current_user = detected_user
@@ -99,27 +118,40 @@ if __name__ == "__main__":
         "age": None,
     }
 
-    context = "Tu viens de faire semblant de bugger pour éviter de répondre à une question embarassante"
+    context = ""
 
     # Generate the answer using the LLM
-    answer = generate_answer(question, current_session, context, conn, current_user, visual_profile)
+    start_time = time.time()
+    answer, retrieved_features = generate_answer(question, current_session, context, conn, current_user, visual_profile)
+    end_time = time.time()
     memory_thread.join()
 
-    print(f"Answer generated: {answer}")
+    if SAVE_HTML:
+        html_blocks.append(utils.display_answer(answer, memory_user, retrieved_features, end_time - start_time, jupyter=False))
+        html_blocks.append(utils.user_memory_to_html(memory_user, user_image, f"Memory updated for {current_user}", title="Updated Memory", jupyter=False))
 
-    # Printing and plotting
-    n_frames = len(speaking_face_row)
-    fig, axes = plt.subplots(1, n_frames, figsize=(n_frames * 2, 2), constrained_layout=True)
+        utils.save_html_page(html_blocks, filename=f"output.html")
+        print(f"HTML saved to output.html")
 
-    # Plot each frame
-    for j in range(n_frames):
-        ax = axes[j]
-        ax.imshow(speaking_face_row[j])
-        ax.axis('off')
+        # Open the HTML file in the default web browser
+        webbrowser.open("output.html")
 
-    plt.suptitle(f'"{transcript}"', fontsize=16)
-    plt.figtext(0.5, 0.01, f"Emotion: {emotion}", wrap=True, horizontalalignment='center', fontsize=12)
+    if not SAVE_HTML:
+        print(f"Answer generated: {answer}")
 
-    plt.tight_layout()
+        # Printing and plotting
+        n_frames = len(speaking_face_row)
+        fig, axes = plt.subplots(1, n_frames, figsize=(n_frames * 2, 2), constrained_layout=True)
 
-    plt.show()
+        # Plot each frame
+        for j in range(n_frames):
+            ax = axes[j]
+            ax.imshow(speaking_face_row[j])
+            ax.axis('off')
+
+        plt.suptitle(f'"{transcript}"', fontsize=16)
+        plt.figtext(0.5, 0.01, f"Emotion: {emotion}", wrap=True, horizontalalignment='center', fontsize=12)
+
+        plt.tight_layout()
+
+        plt.show()

@@ -145,7 +145,8 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     now = time.time()
     retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
     retrival_time = time.time() - now
-    print(f"Retrieved features: {[feature["name"] for feature in retrieved_memory]}")
+    retrieved_features_names = [feature["name"] for feature in retrieved_memory]
+    print(f"Retrieved features: {retrieved_features_names}")
 
     # Check and manage if a visual profile is provided
     if visual_profile:
@@ -202,7 +203,7 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     print(f"Retrieval time: {retrival_time:.2f} seconds")
     
     # Parse the response from the LLM
-    return completion.choices[0].message.content
+    return completion.choices[0].message.content, retrieved_features_names
 
 
 ##########################

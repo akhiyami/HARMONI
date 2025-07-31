@@ -107,7 +107,7 @@ async def ask(question: str = Form(...)):
 
     # Generate the answer using the LLM
     context = None
-    answer = generate_answer(question, current_session, context, conn, current_user)
+    answer, _ = generate_answer(question, current_session, context, conn, current_user)
 
     # Update the session history
     current_session.append({"role": "user", "content": question})

@@ -7,6 +7,7 @@ This module provides functionality to extract audio from video files and transcr
 import whisper
 from moviepy import VideoFileClip
 import os
+from datasets import Audio
 
 #--------------------------------------- Functions ---------------------------------------#
 
@@ -47,5 +48,4 @@ def extract_and_transcribe_audio(video_file, model):
     transcript = transcribe_audio(audio_file, model)
     os.remove(audio_file)
     return transcript
-
 

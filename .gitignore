@@ -8,6 +8,9 @@ conversation/inference.ipynb
 results/
 tests.ipynb
 data/
+output.html
+names_only.txt
+models/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

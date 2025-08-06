@@ -37,7 +37,7 @@ if SAVE_HTML:
 # Load models from vision module
 model = vision_models.YOLO_FACE_MODEL
 landmark_detector = vision_models.LANDMARK_DETECTOR
-whisper_model = vision_models.WHISPER_MODEL
+stt_model = vision_models.WHISPER_MODEL
 emotion_model = vision_models.EMOTION_MODEL
 emotion_processor = vision_models.EMOTION_PROCESSOR
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
-        future_transcript = executor.submit(extract_and_transcribe_audio, f'{name_video}.mp4', whisper_model)
+        future_transcript = executor.submit(extract_and_transcribe_audio, f'{name_video}.mp4', stt_model)
 
         speaking_face_row, grid, probs = future_face.result()
         transcript = future_transcript.result()

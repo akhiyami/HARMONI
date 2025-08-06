@@ -25,7 +25,8 @@ LANDMARK_DETECTOR = dlib.shape_predictor(
 )
 
 # Load Whisper model
-WHISPER_MODEL = whisper.load_model("base")  # or parameterize this
+WHISPER_MODEL = whisper.load_model("turbo")  # or parameterize this
+
 
 # Load facial emotion model
 EMOTION_PROCESSOR = AutoImageProcessor.from_pretrained("dima806/facial_emotions_image_detection")

@@ -25,7 +25,7 @@ name_video = 'sample4'  # Change this to your video name without extension
 # Load models
 model = models.YOLO_FACE_MODEL
 landmark_detector = models.LANDMARK_DETECTOR
-whisper_model = models.WHISPER_MODEL
+stt_model = models.WHISPER_MODEL
 emotion_model = models.EMOTION_MODEL
 emotion_processor = models.EMOTION_PROCESSOR
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
-        future_transcript = executor.submit(extract_and_transcribe_audio, f'videos/{name_video}.mp4', whisper_model)
+        future_transcript = executor.submit(extract_and_transcribe_audio, f'videos/{name_video}.mp4', stt_model)
 
         speaking_face_row, _, _ = future_face.result()
         transcript = future_transcript.result()

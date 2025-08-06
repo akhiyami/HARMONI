@@ -1,6 +1,5 @@
 """
 # app.py
-
 """
 
 #--------------------------------------- Imports ---------------------------------------#
@@ -26,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 
 from conversation.llm.openai_utils import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
-from conversation.memory.utils import create_table
+from conversation.memory.utils import create_table, empty_database
 from conversation.config.settings import LEN_HISTORY
 from conversation.config import models as conversation_models
 
@@ -52,7 +51,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Load models from vision module
 model = vision_models.YOLO_FACE_MODEL
 landmark_detector = vision_models.LANDMARK_DETECTOR
-whisper_model = vision_models.WHISPER_MODEL
+stt_model = vision_models.WHISPER_MODEL
 emotion_model = vision_models.EMOTION_MODEL
 emotion_processor = vision_models.EMOTION_PROCESSOR
 
@@ -67,6 +66,8 @@ conn = sqlite3.connect(database)
 create_table(conn)    
 
 current_session = []
+current_user_image = None
+html_blocks = []
 
 #--------------------------------------- Routes ---------------------------------------#
 
@@ -84,6 +85,8 @@ async def set_video(video: UploadFile = File(...)):
     """
     Handle the user's video input, extract audio, transcribe it, and update the user's memory.
     """
+    global html_blocks, current_user_image
+    html_blocks = []  
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         shutil.copyfileobj(video.file, tmp)
@@ -94,12 +97,15 @@ async def set_video(video: UploadFile = File(...)):
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
-        future_transcript = executor.submit(extract_and_transcribe_audio, tmp_path, whisper_model)
+        future_transcript = executor.submit(extract_and_transcribe_audio, tmp_path, stt_model)
 
         speaking_face_row, grid, probs = future_face.result()
         transcript = future_transcript.result()
 
+    html_blocks.append(utils.display_image_grid_html(grid, probs, np.argmax(probs), jupyter=False))
+
     user_image = speaking_face_row[0]
+    
 
     with ThreadPoolExecutor(max_workers=2) as executor:
 
@@ -110,12 +116,17 @@ async def set_video(video: UploadFile = File(...)):
         detected_user, memory_user = future_user.result()
 
     # Convert user_image (numpy array) to base64 string for sharing via JSON
-    
-
     if isinstance(user_image, np.ndarray):
         img_pil = Image.fromarray(user_image)
     elif isinstance(user_image, Image.Image):
         img_pil = user_image.convert("RGB")  # Ensure it's in RGB format  
+
+    user_image = np.array(user_image)
+    current_user_image = user_image
+
+    html_blocks.append(utils.user_memory_to_html(memory_user, user_image, f"Detected User: {detected_user}", jupyter=False))
+    html_blocks.append(utils.display_pie_chart(emotions, probs, emotion, prob, jupyter=False))
+    html_blocks.append(utils.display_sequence_with_transcription(speaking_face_row, transcript, jupyter=False))
 
     buf = io.BytesIO()
     img_pil.save(buf, format='PNG')
@@ -139,7 +150,7 @@ async def answer_question(
     """
     Process the user's question, update their memory, and return the response.
     """
-    global current_session
+    global current_session, html_blocks, current_user_image
     # Update memory with emotion and question
     def update_user_memory():
         start_time = time.time()
@@ -167,17 +178,44 @@ async def answer_question(
     context = ""
 
     # Generate the answer using the LLM
-    answer, _ = generate_answer(question, current_session, context, conn, current_user, visual_profile)
+    start_time = time.time()
+    answer, retrieved_features = generate_answer(question, current_session, context, conn, current_user, visual_profile)
+    end_time = time.time()
     memory_thread.join()
 
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
+
+    html_blocks.append(utils.display_answer(answer, memory_user, retrieved_features, end_time - start_time, jupyter=False))
+    html_blocks.append(utils.user_memory_to_html(memory_user, current_user_image, f"Memory updated for {current_user}", title="Updated Memory", jupyter=False))
+
+    html_text = ('\n').join([str(block) for block in html_blocks])
 
     print(f"Answer generated: {answer}")
 
     return {
         "answer": answer,
         "profile": memory_user,
+        "logs": html_text,
     }
 
-    
+@app.post("/reset_session")
+async def reset_session():
+    global current_session, html_blocks, current_user_image
+    current_session = []
+    html_blocks = []
+    current_user_image = None
+    return {"status": "success"}
+
+
+@app.post("/reset_database")
+async def reset_database():
+    conn = sqlite3.connect(database)
+
+    empty_database(conn)
+
+    conn = sqlite3.connect(database) 
+    create_table(conn) 
+
+    conn.close()
+    return {"status": "success"}

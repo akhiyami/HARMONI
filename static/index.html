@@ -8,6 +8,37 @@
 </head>
 
 <body>
+
+    <!-- Pop ups windows -->
+    <div id="processingOverlay" class="processing">
+        <div class="processing-text">
+            <div>Processing video...</div>
+            <div class="loader"></div>
+        </div>
+    </div>
+
+    <div id="logs">
+        <button id="closeLogsBtn" aria-label="Close logs">&times;</button>
+        <h1 style="text-align: center;">Logs</h1>
+        <div id="log_content">Nothing to show yet</div>
+    </div>
+
+    <div id="verifBackground">
+    
+
+    <div id="verifWindow">
+        <h2 style="margin:0; padding:0;">Are you sure you want to reset the database?</h2>
+        <p>This will delete all data in the database.</p>
+        <p>Do you want to continue?</p>
+        <div class="reset_buttons">
+            <button id="confirmResetBtn">Yes, reset</button>
+            <button id="cancelResetBtn">Cancel</button>
+        </div>
+    </div>
+
+    </div>
+
+
     <!-- Input video section -->
     <div id="user_container">
 
@@ -18,11 +49,14 @@
             </div>
             <video id="video_preview" src="" alt="Vidéo de l'utilisateur actif" controls></video>
 
-            <div class="change_video">
-                <label for="videoInput" class="user-label">
-                    Change video
+            <div class="buttons_video">
+                <div class="change_video">
+                    <label for="videoInput" class="user-label">Change video</label>
                     <input type="file" id="videoInput" accept="video/*" onchange="handleVideoSelect(event)">
-                </label>
+                </div>
+                <div class="show_logs">
+                    <button id="show_logs_button" onclick="showLogs()" disabled>Show logs</button>
+                </div>
             </div>
         </div>
         
@@ -44,6 +78,16 @@
     <!-- Conversation session -->
     <div id="chatbox"></div>
 
+    <!-- Session reset button -->
+     <div class="reset_area">
+        <div id="reset_session">
+            <button id="resetSessionBtn" onclick="resetSession()">Reset Session</button>
+        </div>
+        <div id="reset_database">
+            <button id="resetDatabaseBtn" onclick="verifCleanDatabase()">Reset Database</button>
+        </div>
+    </div>
+
 
     <!-- Script for dynamic behavior -->
     <script>
@@ -51,6 +95,12 @@
         const video = document.getElementById("video_container");
         const profile = document.getElementById("profile");
         profile.style.height = `${video.offsetHeight}px`;
+
+        document.getElementById('closeLogsBtn').addEventListener('click', () => {
+            document.getElementById('logs').style.display = 'none';
+        });
+
+        document.getElementById('show_logs_button').disabled = true;
 
         //constants
         const chatbox = document.getElementById("chatbox");
@@ -66,14 +116,25 @@
             const preview = document.getElementById('video_preview');
             const videoPlaceholder = document.getElementById('video_placeholder');
             const userPreview = document.getElementById('user_preview');
+            const processingOverlay = document.getElementById('processingOverlay');
+            const videoInput = document.getElementById('videoInput');
+            const videoLabel = document.querySelector('.change_video label');
             
             if (file) {
+                videoInput.disabled = true;
+                videoLabel.classList.add('disabled');
+
+                document.getElementById('show_logs_button').disabled = true;
+
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     preview.src = e.target.result;
                     preview.style.display = 'inline';
                     videoPlaceholder.style.display = 'none';    
                 };
+                // Show processing overlay
+                processingOverlay.style.visibility = 'visible';
+                
                 reader.readAsDataURL(file);
                 // Send the video file to the server
                 const formData = new FormData();
@@ -84,6 +145,9 @@
                 })
                 .then(response => response.json())
                 .then(data => {
+                    // Hide processing overlay
+                    processingOverlay.style.visibility = 'hidden';
+
                     addMessage(data.detected_user, data.transcript, "user");
                     
                     // update detected user
@@ -119,23 +183,39 @@
                             }
                             live_profile.innerHTML = html;
                         }   
-                        
+
+                    const writingIndicator = document.createElement("div");
+                    writingIndicator.className = "writing";
+                    writingIndicator.innerHTML = `
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    `;
+                    chatbox.appendChild(writingIndicator);
+                    chatbox.scrollTop = chatbox.scrollHeight;
+                            
                     // post emotion and memory and question to an other route
                     const formDataAnswer = new FormData();
                     formDataAnswer.append('emotion', data.emotion);
                     formDataAnswer.append('current_user', data.detected_user);
                     formDataAnswer.append('question', data.transcript);
+
                     fetch('/answer', {
                         method: 'POST',
                         body: formDataAnswer
                     })
                     .then(response => response.json())
                     .then(data => {
+                        const existingWriting = document.querySelector('.writing');
+                        if (existingWriting) {
+                            existingWriting.remove();
+                        }
                         if (data.answer) {
                             addMessage("Assistant", data.answer, "bot");
                         } else {
                             addMessage("Assistant", "Aucune réponse disponible pour cette question.", "system");
                         }
+
                         if (!data.profile) {
                             live_profile.innerHTML = "";
                         } else {
@@ -156,6 +236,13 @@
                             }
                             live_profile.innerHTML = html;
                         }   
+                        videoInput.disabled = false;
+                        videoLabel.classList.remove('disabled');
+
+                        // Update logs
+                        const logContent = document.getElementById("log_content");
+                        logContent.innerHTML = data.logs || "Nothing to show yet";
+                        document.getElementById('show_logs_button').disabled = false;
                     });
                 });
 
@@ -176,9 +263,70 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
+        function showLogs() {
+            const logs = document.getElementById("logs");
+            if (logs.style.display === "none" || logs.style.display === "") {
+                logs.style.display = "block";
+            } else {
+                logs.style.display = "none";
+            }
+        }
+
+        function resetSession() {
+            fetch('/reset_session', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    chatbox.innerHTML = "";
+                    live_profile.innerHTML = "";
+                    user_label.textContent = "";
+                    document.getElementById('video_preview').src = "";
+                    document.getElementById('video_preview').style.display = 'none';
+                    document.getElementById('video_placeholder').style.display = 'inline';
+                    document.getElementById('user_preview').src = "";
+                    document.getElementById('user_placeholder').style.display = 'inline';
+                    document.getElementById('user_preview').style.display = 'none';
+
+                    document.getElementById('show_logs_button').disabled = true;
+                    addMessage("System", "Session has been reset.", "system");
+                }
+            });
+        }
+
+        function verifCleanDatabase() {
+            const verifBackground = document.getElementById('verifBackground');
+            const verifWindow = document.getElementById('verifWindow');
+
+            verifBackground.style.display = 'block';
+            verifWindow.style.display = 'block';
+
+            document.getElementById('confirmResetBtn').onclick = function() {
+                resetDatabase();
+                verifBackground.style.display = 'none';
+                verifWindow.style.display = 'none';
+            };
+
+            document.getElementById('cancelResetBtn').onclick = function() {
+                verifBackground.style.display = 'none';
+                verifWindow.style.display = 'none';
+            };
+        }
+
+        function resetDatabase() {
+            fetch('/reset_database', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    resetSession();
+                }
+            });
+        }
        
     </script>
 
 </body>
-
 </html>

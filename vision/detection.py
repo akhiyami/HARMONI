@@ -200,12 +200,12 @@ def process_detections(frame, model, current_faces, face_images, frames_stack, i
             faces = deque(maxlen=LEN_FRAME_BUFFER)
             faces.append(bbox)
             current_faces.append(faces)
+            updated_idx.append(True)
             face_images.append(img_rgb)
             frames_stack[i // FRAME_STRIDE][len(face_images) - 1] = img_rgb  # Update frame stack
 
     # Remove faces that have not been updated for a while (we assume they have left the scene)
     remove_stale_faces(current_faces, face_images, updated_idx)
-
 
 def remove_stale_faces(current_faces, face_images, updated_idx):
     """

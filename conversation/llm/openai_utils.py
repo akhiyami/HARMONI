@@ -183,6 +183,9 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     # Prepare the context prompt
     if context is None:
         context = ''
+
+    print(context)
+    print(type(context))
         
     context_prompt = {
         "role": "system",

@@ -18,10 +18,13 @@ import sqlite3
 import torch
 from transformers import SiglipVisionModel, SiglipImageProcessor
 from PIL import Image
+from torchvision.transforms import Compose, ToTensor, Normalize, Resize
+import cv2
 
 import numpy as np
 
 from conversation.config.settings import RECOGNITION_THRESHOLD 
+from conversation.config.utils import suppress_stdout
 
 
 #--------------------------------------- Functions ---------------------------------------#
@@ -133,7 +136,37 @@ def update_memory(new_memory_object, current_user, conn, database=None):
     return memory_retriever(current_user, conn)
 
 
-def user_retriever(img, conn, processor, model, database=None):
+def get_embeddings(img, model_config):
+    if model_config["name"] == "ULIP-p16":
+        model = model_config["model"]
+        processor = model_config["processor"]
+
+        inputs = processor(images=img, return_tensors="pt")
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            embedding = outputs.pooler_output  # shape: [1, hidden_dim]
+
+        embedding = torch.nn.functional.normalize(embedding, dim=-1)
+        return embedding
+    
+    elif model_config["name"] == "INSIGHTFACE":
+        model = model_config["model"]
+        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        with suppress_stdout():
+            embedding = model.get_feat(img)
+
+        embedding = torch.tensor(embedding)
+        # Normalize the embedding
+        embedding = torch.nn.functional.normalize(embedding, dim=-1)
+        return embedding
+    
+    else:
+        raise ValueError("Unknown model name provided for embedding extraction.")
+
+ 
+def user_retriever(img, conn, model_config, database=None):
     """
     Retrieve or create a user based on face encodings.
     This function checks if the user already exists in the database based on the provided encodings.
@@ -151,13 +184,7 @@ def user_retriever(img, conn, processor, model, database=None):
         conn = sqlite3.connect(database)
         new_conn = True
 
-    inputs = processor(images=img, return_tensors="pt")
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-        embedding = outputs.pooler_output  # shape: [1, hidden_dim]
-
-    embedding = torch.nn.functional.normalize(embedding, dim=-1)
+    embedding = get_embeddings(img, model_config)
 
     if conn is None:
         raise ValueError("A database connection is required.")
@@ -175,7 +202,8 @@ def user_retriever(img, conn, processor, model, database=None):
         similarities = cos(embedding, known_user_embeddings)
 
         best_score, best_idx = torch.max(similarities, dim=0)
-        if best_score.item() > RECOGNITION_THRESHOLD:
+        print(f"Best score: {best_score.item()}")
+        if best_score.item() > 0.5: #TODO: remake this a config variable
             # If a user is found, return the user ID and their memory
             user_id = list(embeddings_dict.keys())[best_idx.item()]
             try:

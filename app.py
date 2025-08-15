@@ -27,7 +27,7 @@ from conversation.llm.openai_utils import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.memory.utils import create_table, empty_database
 from conversation.config.settings import LEN_HISTORY
-from conversation.config import models as conversation_models
+from conversation.config import get_face_embedding_model
 
 from vision.config import models as vision_models
 from vision.detection import detect_speaking_face
@@ -37,6 +37,7 @@ from vision.emotions import detect_emotions
 import utils 
 import base64
 import io
+import json
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
@@ -56,18 +57,18 @@ emotion_model = vision_models.EMOTION_MODEL
 emotion_processor = vision_models.EMOTION_PROCESSOR
 
 # Load user retriever model and processor
-user_retriever_model = conversation_models.USER_RETRIEVER_MODEL
-user_retriever_processor = conversation_models.USER_RETRIEVER_PROCESSOR
-
+user_retriever_config = get_face_embedding_model("ULIP-p16")
 
 # Database connection for user retrieval
 database = 'users.db'
 conn = sqlite3.connect(database)
-create_table(conn)    
+create_table(conn)   
+conn.close() 
 
 current_session = []
 current_user_image = None
 html_blocks = []
+current_context = ""
 
 #--------------------------------------- Routes ---------------------------------------#
 
@@ -106,11 +107,10 @@ async def set_video(video: UploadFile = File(...)):
 
     user_image = speaking_face_row[0]
     
-
     with ThreadPoolExecutor(max_workers=2) as executor:
 
         future_emotion = executor.submit(detect_emotions, speaking_face_row, emotion_model, emotion_processor)
-        future_user = executor.submit(user_retriever, user_image, None, user_retriever_processor, user_retriever_model, database)
+        future_user = executor.submit(user_retriever, user_image, None, user_retriever_config, database)
 
         emotion, prob, emotions, probs = future_emotion.result()
         detected_user, memory_user = future_user.result()
@@ -175,13 +175,16 @@ async def answer_question(
         "age": None,
     }
 
-    context = ""
+    context = current_context
 
+    conn = sqlite3.connect(database)
     # Generate the answer using the LLM
     start_time = time.time()
     answer, retrieved_features = generate_answer(question, current_session, context, conn, current_user, visual_profile)
     end_time = time.time()
     memory_thread.join()
+
+    conn.close()
 
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
@@ -192,6 +195,7 @@ async def answer_question(
     html_text = ('\n').join([str(block) for block in html_blocks])
 
     print(f"Answer generated: {answer}")
+    print(f"Memory user: {memory_user}")
 
     return {
         "answer": answer,
@@ -219,3 +223,77 @@ async def reset_database():
 
     conn.close()
     return {"status": "success"}
+
+@app.get("/get_context")
+async def get_context():
+    """
+    Get the current context for the user.
+    """
+    global current_context
+    return {"context": current_context}
+
+@app.post("/set_context")
+async def set_context(context: str = Form(...)):
+    """
+    Update the context for the user.
+    """
+    global current_context
+    current_context = context
+    return {"status": "success"}
+
+@app.post("/identify_user")
+async def identify_user(user_image: UploadFile = File(...)):
+    """
+    Edit user information.
+    """
+    global current_user_image
+    image_bytes = await user_image.read()
+
+    current_user_image = Image.open(io.BytesIO(image_bytes))
+    current_user_image = current_user_image.convert("RGB")
+    current_user_image = np.array(current_user_image)
+
+    detected_user, memory_user = user_retriever(current_user_image, None, user_retriever_config, database)
+    
+    return {
+        "user": detected_user,
+        "profile": memory_user
+    }
+
+@app.post("/edit_user")
+async def edit_user(
+    user_id: str = Form(...),
+    profile_data: str = Form(...),
+    ):
+    """
+    Edit user information in the database.
+    """
+    # Parse the JSON string sent from the frontend
+    try:
+        profile_dict = json.loads(profile_data)
+    except json.JSONDecodeError as e:
+        return {"status": "error", "message": f"Invalid JSON data: {str(e)}"}
+
+    # update the user profile in the database here
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    # reset the user table
+    cursor.execute(f"DELETE FROM {user_id}")
+    conn.commit()
+
+    # Insert the new profile data
+    for feature in profile_dict:
+        tags_list = feature.get("tags", [])
+        tags = ';'.join(tags_list) if isinstance(tags_list, list) else tags_list
+        values_list = feature.get("value", [])
+        value = ';'.join(values_list) if isinstance(values_list, list) else values_list
+        cursor.execute(
+            f"INSERT INTO {user_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
+            (feature.get("type"), feature.get("name"), feature.get("description"), tags, value),
+        )
+
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
+    
+    

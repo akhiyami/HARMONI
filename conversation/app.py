@@ -32,7 +32,7 @@ from fastapi.staticfiles import StaticFiles
 from conversation.llm.openai_utils import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.config.settings import LEN_HISTORY
-from conversation.config import models
+from conversation.config import get_face_embedding_model
 from conversation.memory.utils import create_table
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
@@ -53,9 +53,7 @@ current_user = None
 current_session = deque(maxlen=LEN_HISTORY)
 
 # facial encoding model
-model = models.USER_RETRIEVER_MODEL
-processor = models.USER_RETRIEVER_PROCESSOR
-model.eval()
+model_config = get_face_embedding_model("INSIGHTFACE")  # or "ULIP-p16" for Siglip
 
 #--------------------------------------- Routes ---------------------------------------#
 
@@ -119,7 +117,7 @@ async def ask(question: str = Form(...)):
     print(f"All ask_llm route takes {time.time() - all_start:.2f} seconds")
 
     return {"answer": answer, "profile": memory_user}
-
+ 
 
 @app.post("/set_user")
 async def set_user(image: UploadFile = File(...)):
@@ -133,7 +131,7 @@ async def set_user(image: UploadFile = File(...)):
     image_bytes = await image.read()
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
     
-    new_user, new_memory = user_retriever(img, conn, processor, model)
+    new_user, new_memory = user_retriever(img, conn, model_config)
 
     if new_user != current_user :# Check if a new user was identified
 

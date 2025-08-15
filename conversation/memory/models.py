@@ -7,19 +7,28 @@ Define the data models for the memory system using Pydantic.
 from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
 
-###############
+import yaml
 
-# define here the vocabulary for contextual features 
-VOCABULARY = ["emploi", "intérêts", "loisirs", "sports", "musique", "voyages", "technologie", "famille", "amis", "animaux", "nourriture"] 
+#--------------------------------------- Config ---------------------------------------#
+
+#load config from YAML file
+with open("config.yaml", "r") as file:
+    config = yaml.safe_load(file)
+
+# define here the vocabulary for contextual features
+vocabulary = config.get("memory", {}).get("vocabulary", [])
 
 # Define the patterns for name field (contextual features)
 free_pattern = r"^\w+$"
-closed_vocaluary_pattern = r"^(" + "|".join(VOCABULARY) + r")$"
+closed_vocabulary_pattern = r"^(" + "|".join(vocabulary) + r")$"
+
+pattern = closed_vocabulary_pattern if config.get("memory", {}).get("closed_vocabulary", True) else free_pattern
+
+###############
 
 # Define the type aliases for tags and values
 TagsListType = List[str]
 ValueListType = List[str]
-
 
 #--------------------------------------- Data Models ---------------------------------------#
 
@@ -57,7 +66,7 @@ class ContextualFeature(BaseModel):
     )
     name: str = Field(
         ..., 
-        pattern=free_pattern, # or closed_vocaluary_pattern,
+        pattern=pattern,
         description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: hobby, emploi, intérêts...)."
     )
     description: str = Field(

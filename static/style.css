@@ -11,6 +11,14 @@ body {
 .system { color: gray; }
 .error { color: red; }
 
+
+textarea {
+    padding: 0.5rem;
+    font-family: Arial, sans-serif;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
 /* Writing animation */
 
 .writing {
@@ -86,7 +94,6 @@ body {
 }
 
 
-
 #user_container {
     display: flex;
     justify-content: space-evenly;
@@ -94,7 +101,6 @@ body {
     margin-top: 1rem;
     flex-direction: row;
     box-sizing: border-box;
-
     margin-bottom: 1rem;
 }
 
@@ -125,7 +131,7 @@ body {
     object-fit: cover;
 }
 
-#user_box {
+.user_box {
     width: 65%;
     display: flex;
     flex-direction: row;
@@ -135,7 +141,7 @@ body {
     padding: 1rem;
 }
 
-#user {
+.user {
     width: 20%;
     display: flex;
     flex-direction: column;
@@ -143,6 +149,34 @@ body {
     padding: 0.5rem;
     box-sizing: border-box;
     align-self: center;
+}
+
+.edit_user_box {
+    width: 100%;
+    max-height: 50vh;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-evenly;
+    box-sizing: border-box;
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.edit_user {
+    width: 20%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    align-self: center;
+}
+
+.edit_user img {
+    width: 80%;
+    height: auto;
 }
 
 #user_placeholder, #user_preview {
@@ -156,13 +190,13 @@ body {
     max-width: 100%;
 }
 
-#user_label {
+.user_label {
     font-weight: bold;
     margin-top: 0.5rem;
     font-size: 1.2rem;
 }
 
-#profile {
+.profile {
     width: 70%;
     padding: 1.5rem 2rem;
     align-self: center;
@@ -170,7 +204,7 @@ body {
     overflow-y: scroll;
 }
 
-#profile_label {
+.profile_label {
     font-weight: bold;
     margin-bottom: 0.5rem;
     font-size: 1.2rem;
@@ -210,31 +244,23 @@ button {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-.show_logs button {
-    background-color: #007BFF; /* Blue background */
-}
-
-#show_logs_button:hover {
-    background-color: #0056b3; /* Darker blue on hover */
-}
-
 /* Disabled state */
-#show_logs_button:disabled {
+button:disabled {
     background-color: #888;
     cursor: not-allowed;
     opacity: 0.5;
 }
 
-.change_video {
+.browse_file {
     text-align: center;
 }
 
 /* Hide the actual file input */
-.change_video input[type="file"] {
+.browse_file input[type="file"] {
     display: none;
 }
 
-label.user-label.disabled {
+label.browse_button-label.disabled {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
@@ -242,9 +268,8 @@ label.user-label.disabled {
 }
 
 /* Style the label to look like a button */
-.user-label {
-    display: inline-block;
-    background-color: #4CAF50;         /* Green background */
+.browse_button {
+    display: inline-block;       /* Green background */
     color: white;                      /* White text */
     padding: 0.5rem 1rem;              /* Spacing inside the button */
     font-size: 1rem;
@@ -253,17 +278,6 @@ label.user-label.disabled {
     cursor: pointer;
     transition: background-color 0.3s ease;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-/* Hover effect */
-.user-label:hover {
-    background-color: #45a049;
-}
-
-/* Optional: focus effect */
-.user-label:focus-within {
-    outline: 2px solid #2e7d32;
-    outline-offset: 2px;
 }
 
 #logs {
@@ -300,7 +314,8 @@ label.user-label.disabled {
     transition: color 0.2s ease;
 }
 
-#verifBackground {
+
+.background {
     position: fixed;
     top: 0;
     left: 0;
@@ -311,13 +326,13 @@ label.user-label.disabled {
     display: none; /* this is the fix! */
 }
 
-#verifWindow {
+.window {
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 30%;;
-    height: 20%;
+    min-width: 40%;
+    min-height: 30%;
     background-color: #f9f9f9;
     border: 1px solid #ccc;
     border-radius: 8px;
@@ -326,9 +341,14 @@ label.user-label.disabled {
     z-index: 10000; /* on top */
     text-align: center;
     align-content: center;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
 }
 
-.reset_buttons {
+.window_buttons {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -337,24 +357,38 @@ label.user-label.disabled {
     margin-top: 2rem;
 }
 
-#confirmResetBtn {
-    background-color:  #f44336; /* Red background */
-}
-#confirmResetBtn:hover {
-    background-color: #d32f2f; /* Darker red on hover */
-}
-#cancelResetBtn {
-    background-color: #aaa; /* Red background */
-}
-#cancelResetBtn:hover {
-    background-color: #888; /* Darker red on hover */
+#contextWindow {
+    min-width: 40%;
+    min-height: 30%;
 }
 
+#verifWindow {
+    min-width: 30%;
+    min-height: 20%;
+}
 
-#closeLogsBtn:hover,
-#closeLogsBtn:focus {
-    color: #333;
-    outline: none;
+#editUserBtn {
+    display: None;
+}
+
+#userLabel {
+    background-color: #2196F3; /* Blue background */
+}
+
+#userLabel:hover {
+    background-color: #1976D2; /* Darker blue on hover */
+}
+
+#userWindow {
+    min-width: 60%;
+    max-height: 70vh; 
+    display: none;
+}
+
+#featureWindow {
+    min-width: 60%;
+    max-height: 70vh; 
+    display: none;
 }
 
 .reset_area {
@@ -367,19 +401,283 @@ label.user-label.disabled {
     gap: 1rem;
 }
 
-#resetSessionBtn {
-    background-color: #4CAF50; /* Green background */
-    margin:auto;
+.browse_button {
+    display: inline-block;       /* Green background */
+    color: white;                     /* White text */
+    background-color: #4CAF50;         /* Green background */
+    padding: 0.5rem 1rem;              /* Spacing inside the button */
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
-#resetSessionBtn:hover {
+
+.browse_button:hover {
+    background-color: #45a049; /* Darker green on hover */
+}
+
+label.browse_button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    background-color: #888; /* Grey background */
+}
+
+.window_buttons {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+}
+
+.grey_button {
+    background-color: #aaa; /* Grey background */
+}
+.grey_button:hover {
+    background-color: #888; /* Darker grey on hover */
+}
+
+.green_button {
+    background-color: #4CAF50; /* Green background */
+}
+.green_button:hover {
     background-color: #2e7d32; /* Darker green on hover */
 }
-#resetDatabaseBtn { 
-    background-color: #f44336; /* Red background */
-    margin:auto;
+
+.blue_button {
+    background-color: #2196F3; /* Blue background */
 }
-#resetDatabaseBtn:hover {
+.blue_button:hover {
+    background-color: #1976D2; /* Darker blue on hover */
+}
+
+.red_button { 
+    background-color: #f44336; /* Red background */
+}
+.red_button:hover {
     background-color: #d32f2f; /* Darker red on hover */
 }
 
 
+
+/* CSS for the table container */
+
+.container {
+    width: 75%;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden; /* clip table to rounded corners */
+}
+
+.container table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.container thead {
+    background-color: #4CAF50;
+    box-shadow: inset -5px -7px 12px #45a448;
+    color: white;
+}
+
+.container thead th {
+    padding: 12px;
+}
+
+.container tbody {
+    display: block;             /* allow scrolling */
+    max-height: 50vh;           /* limit height */
+    overflow-y: auto;          /* enable vertical scroll */
+    font-size: smaller;
+    color: #333;
+    
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #4CAF50 #fcfcfc;
+}
+
+.container thead,
+.container tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.container tbody tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+.container tbody tr:nth-child(even) {
+    background-color: #f8f8f8;
+}
+
+.container tbody tr:hover {
+    background-color: #c4ebc6; /* light green on hover */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.container tbody tr.expanded {
+    background-color: #9acf9a; /* slightly darker green for expanded row */
+}
+
+.container tbody tr.expanded-detail {
+    background-color: #8cca8c; /* even lighter green for detail row */
+    cursor: default; /* prevent pointer cursor on detail row */
+}
+
+.container tbody tr.expanded-detail textarea {
+    border: none;
+    background-color: rgba(255, 255, 255, 0.553);
+    font-family: inherit;
+    padding: 5px;
+    font-size: smaller;
+    width: 100%;
+    box-sizing: border-box; /* ensure padding does not affect width */
+    resize: none; /* prevent resizing */
+
+
+}
+.container tbody tr.expanded-detail textarea:hover {
+    background-color: rgba(255, 255, 255, 0.8); /* slightly darker on hover */
+}
+
+.container tbody tr.expanded-detail textarea:focus {
+    outline: none; /* remove default focus outline */
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); /* add a subtle shadow on focus */
+    background-color: #fff;
+}
+.container tbody tr.expanded-detail textarea:active {
+    background-color: #fff
+}
+
+.container tbody td {
+    padding: 12px;
+}
+
+
+
+.detail-wrapper {
+    height: 0;
+    overflow: hidden;
+    padding: 0px;
+    transition: height 0.3s ease, padding 0.3s ease;
+    margin: 0;
+}
+
+.detail-wrapper .button-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 0 0 10px 0;
+}
+
+.detail-wrapper .button-row button {
+    color: white;
+    border: none;
+    padding: 5px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    width: fit-content;
+    margin: 0;
+}
+
+
+/* ===== Scrollbar ===== */
+.container tbody::-webkit-scrollbar {
+    width: 8px;
+}
+
+.container tbody::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.container tbody::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 10px;
+}
+
+.container tbody::-webkit-scrollbar-thumb:hover {
+    background: #45a049;
+}
+
+
+/* FORM */
+.pill-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;   
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: text;
+    background-color: #fff;
+    align-items: center;    /* Center vertically */
+    overflow-y: hidden;
+    overflow-x: auto;
+    height: 36px;  /* Set a base height equal to pill height */
+}
+
+.pill {
+    background-color: #007BFF;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap; 
+}
+
+.pill button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.pill-container input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 80px;
+    padding:0;
+    margin:0;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width : 90%;
+    margin : auto; 
+}
+
+form label {
+    display: block;
+}
+
+form textarea {
+    padding: 10px 5px;;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: text;
+    background-color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    resize: none;
+}
+
+form textarea:focus {
+    outline: none;
+}

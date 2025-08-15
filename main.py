@@ -44,6 +44,11 @@ emotion_processor = vision_models.EMOTION_PROCESSOR
 # Load user retriever model and processor
 user_retriever_model = conversation_models.USER_RETRIEVER_MODEL
 user_retriever_processor = conversation_models.USER_RETRIEVER_PROCESSOR
+user_retriever_config = {
+    "model": user_retriever_model,
+    "processor": user_retriever_processor,
+    "name": "ULIP-p16"
+}
 
 # Database connection for user retrieval
 database = 'users.db'
@@ -79,7 +84,7 @@ if __name__ == "__main__":
     with ThreadPoolExecutor(max_workers=2) as executor:
 
         future_emotion = executor.submit(detect_emotions, sample_speaking_face_row, emotion_model, emotion_processor)
-        future_user = executor.submit(user_retriever, user_image, None, user_retriever_processor, user_retriever_model, database)
+        future_user = executor.submit(user_retriever, user_image, None, user_retriever_config, database)
 
         emotion, prob, emotions, probs = future_emotion.result()
         detected_user, memory_user = future_user.result()

@@ -25,5 +25,5 @@ USER_RETRIEVER_PROCESSOR = SiglipImageProcessor.from_pretrained(model_name)
 
 # INSIGHTFACE
 with suppress_stdout():
-    INSIGHTFACE_MODEL = insightface_get_model('buffalo_l', download=True)
+    INSIGHTFACE_MODEL = insightface_get_model('buffalo_l', download=True) #FaceAnalysis(name='buffalo_l')
     INSIGHTFACE_MODEL.prepare(ctx_id=0)  # or -1 for CPU

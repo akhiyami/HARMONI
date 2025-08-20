@@ -28,9 +28,12 @@ reply_prompt = {
         "- Ne pose pas trop de questions à la suite, mais intègre-les naturellement.\n"
         "- Ne modifie pas la mémoire ici, ta tâche est seulement de répondre à l'utilisateur.\n"
         "- Tout doit être écrit en français. \n\n"
+        "- N'invente pas d'informations, base-toi uniquement sur le contexte, et sur le profil des usagers. \n"
+        "- Tu peux ne pas aavoir la réponse à une question. Dans ce cas, tu dois rediriger l'utilisateur vers un humain, et lui dire que tu ne sais pas.\n"
 
         "Important :\n"
         "- Tu peux converser avec plusieurs utilisateurs en même temps, mais tu dois toujours te souvenir de qui est qui.\n"
+        "- Privilégie des réponses courtes et simples, comme dans une conversation normale.\n"
     ),
 }
 
@@ -53,6 +56,8 @@ memory_update_prompt = {
         "- Structure le résultat dans un objet JSON avec deux champs : `primary_features` et `features`.\n"
         "- N'invente rien. Ignore les éléments incertains ou flous.\n"
         "- Ne modifie pas les informations existantes sauf si l'utilisateur les corrige explicitement.\n"
+        "- Les utilisateurs peuvent se tromper, ou avoir des doutes, donc ne change pas les informations sans certitude.\n"
+        "- Par rapport aux rendez-vous de l'utilisateur: tes informations prévalent sur celles de l'utilisateur.\n"
         "- Retourne uniquement : les éventuelles nouvelles features, et les features que tu as modifiées sans changer leur nom.\n"
         "- Ne change sous aucun prétexte le nom d'une feature que tu souhaites modifier.\n"
         "- Ne supprime jamais d'informations de la mémoire, mais mets-les à jour si tu constates des changements, ajouts ou erreurs.\n"

@@ -27,6 +27,7 @@ from memory.models import LongTermMemory
 from llm.prompts import qa_instructions, memory_update_prompt, reply_prompt
 
 ##########
+COSINE_THESHOLD = 0.5
 
 # Initialize OpenAI client and RAG model
 client = OpenAI(api_key=API_KEY)
@@ -69,6 +70,8 @@ def features_retriever(question, conn, user_id):
     for row in rows:
         rowid, tags, embedding = row
         if embedding is None:
+            if tags is None:
+                tags = ""
             tags_list = tags.split(";")
             embedding = rag_model.encode(", ".join(tags_list)).tolist()
             embedding = np.array(embedding, dtype=np.float32).tobytes()  #Convert to bytes for BLOB storage
@@ -86,7 +89,6 @@ def features_retriever(question, conn, user_id):
         cosine_similarities[rowid] = cs[0]
         
         # Filter features based on a cosine similarity threshold
-        COSINE_THESHOLD = 0.5
         filtered = [(rowid, sim) for rowid, sim in cosine_similarities.items() if sim > COSINE_THESHOLD]
         
         # Sort and limit the results to the top n most relevant features
@@ -122,7 +124,7 @@ def features_retriever(question, conn, user_id):
 # ANSWER GENERATION FUNCTION #
 ##############################
 
-def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None):
+def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None, verbose=True):
     """
     Ask the LLM a question and retrieve the answer along with updated memory.
     This function prepares the context and session history, retrieves relevant features from the user's memory,
@@ -135,6 +137,7 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
         conn (sqlite3.Connection, optional): The database connection object. Defaults to None.
         current_user (str, optional): The unique identifier for the user. Defaults to None.
         visual_profile (dict, optional): A dictionary containing visual profile information
+        verbose (bool, optional): Whether to print debug information. Defaults to True.
     Returns:
         str: The answer from the LLM.
     """
@@ -146,7 +149,8 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
     retrival_time = time.time() - now
     retrieved_features_names = [feature["name"] for feature in retrieved_memory]
-    print(f"Retrieved features: {retrieved_features_names}")
+    if verbose:
+        print(f"Retrieved features: {retrieved_features_names}")
 
     # Check and manage if a visual profile is provided
     if visual_profile:
@@ -174,18 +178,15 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     # Prepare the long term memory context
     ltm = {
         "role": "system", 
-         "content": [{ 
+        "content": [{ 
             "type": "text",
-            "text": json.dumps(retrieved_memory, indent=2)  
+            "text": json.dumps(retrieved_memory, indent=2, ensure_ascii=False)  # ensure_ascii=False preserves characters like "é"
         }]
     }
 
     # Prepare the context prompt
     if context is None:
         context = ''
-
-    print(context)
-    print(type(context))
         
     context_prompt = {
         "role": "system",
@@ -202,8 +203,9 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     )
     generation_time = time.time() - now
 
-    print(f"Generation time: {generation_time:.2f} seconds")
-    print(f"Retrieval time: {retrival_time:.2f} seconds")
+    if verbose:
+        print(f"Generation time: {generation_time:.2f} seconds")
+        print(f"Retrieval time: {retrival_time:.2f} seconds")
     
     # Parse the response from the LLM
     return completion.choices[0].message.content, retrieved_features_names
@@ -213,7 +215,7 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
 # MEMORY UPDATE FUNCTION #
 ##########################
 
-def update_memory_llm(user_question, history, conn=None, current_user=None, database=None):
+def update_memory_llm(user_question, conn=None, current_user=None, database=None):
     """
     Appelle le LLM pour analyser l’échange et mettre à jour la mémoire.
     Args:
@@ -235,7 +237,7 @@ def update_memory_llm(user_question, history, conn=None, current_user=None, data
     # Last interactions serve as short term memory
     ##########
 
-    stm = deque(history, maxlen=LEN_HISTORY)
+    # stm = deque(history, maxlen=LEN_HISTORY)
     
     ##########
     # Prepare the long term memory context
@@ -280,7 +282,7 @@ def update_memory_llm(user_question, history, conn=None, current_user=None, data
         "role": "system", 
          "content": [{ 
             "type": "text",
-            "text": json.dumps(ltm, indent=2)  
+            "text": json.dumps(ltm, indent=2, ensure_ascii=False)  # ensure_ascii=False preserves characters like "é"
         }]
     }
 
@@ -293,7 +295,7 @@ def update_memory_llm(user_question, history, conn=None, current_user=None, data
         messages=[
             memory_update_prompt,
             ltm,
-            *stm,
+            # *stm,
             {"role": "user", "content": f"Utilisateur : {user_question}"},
         ],
         response_format=LongTermMemory
@@ -303,7 +305,6 @@ def update_memory_llm(user_question, history, conn=None, current_user=None, data
         conn.close()
         
     return completion.choices[0].message.parsed
-
 
 ###########################
 
@@ -322,7 +323,7 @@ def answer_question(question, memory):
         "role": "system",
         "content": [{
             "type": "text",
-            "text": json.dumps(memory, indent=2)  
+            "text": json.dumps(memory, indent=2, ensure_ascii=False)  
         }]
     }
 

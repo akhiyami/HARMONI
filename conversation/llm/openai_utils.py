@@ -31,7 +31,8 @@ COSINE_THESHOLD = 0.5
 
 # Initialize OpenAI client and RAG model
 client = OpenAI(api_key=API_KEY)
-rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+# rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
+rag_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 #--------------------------------------- Functions for interacting with the LLM ---------------------------------------#
 
@@ -80,14 +81,20 @@ def features_retriever(question, conn, user_id):
                 (embedding, rowid)
             )
             conn.commit()
-        
+        # If the embedding already exists, retrieve it
+        else:
+            embedding = np.frombuffer(embedding, dtype=np.float32)
+
         # Calculate cosine similarity between the question and the feature embeddings
         cs = cosine_similarity(
             question_embeddings.reshape(1, -1), 
             np.frombuffer(embedding, dtype=np.float32).reshape(1, -1)
         ).flatten()
         cosine_similarities[rowid] = cs[0]
-        
+
+        name_feature = cursor.execute(f"SELECT name FROM {user_id} WHERE rowid = ?", (rowid,)).fetchone()[0]
+        # print(f"Feature '{name_feature}' (rowid {rowid}) has cosine similarity {cs[0]:.4f}")
+
         # Filter features based on a cosine similarity threshold
         filtered = [(rowid, sim) for rowid, sim in cosine_similarities.items() if sim > COSINE_THESHOLD]
         

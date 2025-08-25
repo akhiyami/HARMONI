@@ -194,9 +194,6 @@ async def answer_question(
 
     html_text = ('\n').join([str(block) for block in html_blocks])
 
-    print(f"Answer generated: {answer}")
-    print(f"Memory user: {memory_user}")
-
     return {
         "answer": answer,
         "profile": memory_user,

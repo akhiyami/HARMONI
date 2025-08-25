@@ -12,6 +12,7 @@ output.html
 names_only.txt
 models/
 tests/
+stream
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -23,8 +23,8 @@ import cv2
 
 import numpy as np
 
-from conversation.config.settings import RECOGNITION_THRESHOLD 
-from conversation.config.utils import suppress_stdout
+from config.settings import RECOGNITION_THRESHOLD 
+from config.utils import suppress_stdout
 
 
 #--------------------------------------- Functions ---------------------------------------#

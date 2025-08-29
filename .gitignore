@@ -2,7 +2,7 @@
 
 # Projet-specific files
 users.db
-conversation/static/users_images
+conv_interface/static/users_images/
 test.ipynb
 conversation/inference.ipynb
 results/
@@ -13,6 +13,7 @@ names_only.txt
 models/
 tests/
 stream
+evaluations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

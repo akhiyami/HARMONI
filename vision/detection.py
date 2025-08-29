@@ -17,7 +17,7 @@ root_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 sys.path.append(root_folder_path)
 
 from vision.post_processing import remove_outliers, stitch_sequences, compute_speaking_probability 
-from vision.config.settings import LEN_FRAME_BUFFER, FRAME_STRIDE
+from config.settings import LEN_FRAME_BUFFER, FRAME_STRIDE
 
 #--------------------------------------- Functions ---------------------------------------#
 

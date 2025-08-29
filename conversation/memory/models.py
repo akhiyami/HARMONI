@@ -12,7 +12,7 @@ import yaml
 #--------------------------------------- Config ---------------------------------------#
 
 #load config from YAML file
-with open("config.yaml", "r") as file:
+with open("config/config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
 # define here the vocabulary for contextual features
@@ -71,13 +71,12 @@ class ContextualFeature(BaseModel):
     )
     description: str = Field(
         ..., 
-        description="Description de la caractéristique, pour donner plus de contexte et de détails sur ce qu'elle représente."
+        description="Description générale de la caractéristique, indépendante de sa valeur, pour donner plus de détails sur ce qu'elle représente."
     )
     tags: TagsListType = Field(
         ..., 
         description="Liste de mots-clés associés à la caractéristique, pour faciliter la recherche et le filtrage. Doit contenir entre 1 et 3 mots-clés.",
-        min_items=1,
-        max_items=3
+        min_items=1
     )
     value: ValueListType = Field(
         ..., 
@@ -101,4 +100,21 @@ class LongTermMemory(BaseModel):
     features: List[Feature] = Field(
         default_factory=list,
         description="Caractéristiques secondaires ou contextuelles (goûts, opinions, expériences...)."
+    )
+
+class Name(BaseModel):
+    name: str = Field(
+        ..., 
+        pattern=pattern,
+        description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: hobby, emploi, intérêts...)."
+    )
+
+class FeaturesNames(BaseModel):
+    Modify: List[str] = Field(
+        ...,
+        description="Liste des noms de caractéristiques à modifier."
+    )
+    Add: List[Name] = Field(
+        ...,
+        description="Liste des noms de caractéristiques à ajouter."
     )

@@ -38,7 +38,7 @@ reply_prompt = {
 }
 
 # Prompt to update the user's memory based on the previous interaction and the last question asked.
-memory_update_prompt = {
+feature_identification_prompt = {
     "role": "system",
     "content": (
         "Tu es un assistant chargé d'analyser un échange entre un robot et un utilisateur pour en extraire des informations utiles à mémoriser.\n"
@@ -49,23 +49,62 @@ memory_update_prompt = {
         "- la mémoire actuelle de l'utilisateur (avec `primary_features` et `features`),\n"
         "- la dernière question de l'utilisateur,\n"
 
-        "Ta mission est de mettre à jour la mémoire de manière structurée.\n\n"
+        "Ta mission est d'indentifier les features à modifier ou à ajouter pour perfectionner le profil.\n\n"
 
         "Instructions :\n"
         "- Analyse s'il y a de nouvelles informations à mémoriser ou des modifications à faire.\n"
-        "- Structure le résultat dans un objet JSON avec deux champs : `primary_features` et `features`.\n"
-        "- N'invente rien. Ignore les éléments incertains ou flous.\n"
-        "- Ne modifie pas les informations existantes sauf si l'utilisateur les corrige explicitement.\n"
-        "- Les utilisateurs peuvent se tromper, ou avoir des doutes, donc ne change pas les informations sans certitude.\n"
-        "- Par rapport aux rendez-vous de l'utilisateur: tes informations prévalent sur celles de l'utilisateur.\n"
-        "- Retourne uniquement : les éventuelles nouvelles features, et les features que tu as modifiées sans changer leur nom.\n"
+        "- Evite la redondance entre les différentes features."
+        "- Structure le résultat dans un objet JSON avec deux champs : `Modify` et `Add`.\n"
+        "- Retourne uniquement : les noms des features que tu souhaites ajouter, et de celles que tu souhaite modifier sans changer leur nom.\n"
         "- Ne change sous aucun prétexte le nom d'une feature que tu souhaites modifier.\n"
-        "- Ne supprime jamais d'informations de la mémoire, mais mets-les à jour si tu constates des changements, ajouts ou erreurs.\n"
-        "- Tu n'as pas besoin de retourner les features totalement inchangées.\n"
         "- Retourne uniquement l'objet JSON, sans commentaire autour."
     ),
 }
 
+add_feature_prompt = {
+    "role": "system",
+    "content":(
+        "Tu es un assistant chargé d'analyser un échange entre un robot et un utilisateur pour en extraire des informations utiles à mémoriser.\n"
+        "- `primary_features` : nom, âge, genre, ton préféré…\n"
+        "- `features` : opinions, faits marquants, préférences, souvenirs, etc.\n\n"
+
+        "Tu reçois :\n"
+        "- Le nom d'une feature à ajouter à la mémoire de l'utilisateur. \n"
+        "- La dernière question de l'utilisateur,\n"
+
+        "Ta mission est d'extraire l'information de cette question pour créer une feature claire, correspondant au nom demandé.\n\n"
+
+        "Instructions :\n"
+        "- Analyse la question de l'utilisateur pour en extraire l'information pertinente.\n"
+        "- Formule la Feature correspondante au nom demandé, de la façon la plus claire possible.\n"
+        "- La description de la caractéristique doit être faite du point de vue d'un observateur extérieur, comme un compte-rendu médical.\n"
+        "- N'invente pas d'information, appuie toi uniquement sur les mots de l'utilisateur.\n"
+        "- Retourne uniquement l'objet JSON, sans commentaire autour."
+    )
+}
+
+modify_feature_prompt = {
+    "role": "system",
+    "content": (
+        "Tu es un assistant chargé d'analyser un échange entre un robot et un utilisateur pour en extraire des informations utiles à mémoriser.\n"
+        "- `primary_features` : nom, âge, genre, ton préféré…\n"
+        "- `features` : opinions, faits marquants, préférences, souvenirs, etc.\n\n"
+
+        "Tu reçois :\n"
+        "- une feature qui doit être modifiée, \n"
+        "- la dernière question de l'utilisateur,\n"
+
+        "Ta mission est de mettre à jour la feature indiquée en fonction des nouvelles informations et des modifications identifiées. \n"
+
+        "Instructions :\n"
+        "- Analyse s'il y a de nouvelles informations à ajouter, où d'anciennes informations à corriger.\n"
+        "- Ne modifie pas les informations existantes sauf si l'utilisateur les corrige explicitement.\n"
+        "- Les utilisateurs peuvent se tromper, ou avoir des doutes, donc ne cherche pas à changer les informations sans certitude.\n"
+        "- Par rapport aux rendez-vous de l'utilisateur: tes informations prévalent sur celles de l'utilisateur.\n"
+        "- Ne change sous aucun prétexte le nom de la feature à modifier.\n"
+        "- Retourne uniquement l'objet JSON, sans commentaire autour."
+    ),
+}
 
 # Instructions for the LLM to briefly answer questions about a user based on their memory (used for testing).
 qa_instructions = {

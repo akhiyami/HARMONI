@@ -23,13 +23,14 @@ from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from conversation.llm.openai_utils import generate_answer, update_memory_llm
+from config import models, get_face_embedding_model
+from config.settings import LEN_HISTORY
+
+from conversation.llm.openai_inferences import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.memory.utils import create_table, empty_database
-from conversation.config.settings import LEN_HISTORY
-from conversation.config import get_face_embedding_model
 
-from vision.config import models as vision_models
+
 from vision.detection import detect_speaking_face
 from vision.audio import extract_and_transcribe_audio
 from vision.emotions import detect_emotions
@@ -50,11 +51,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Global variables for user session management
 # Load models from vision module
-model = vision_models.YOLO_FACE_MODEL
-landmark_detector = vision_models.LANDMARK_DETECTOR
-stt_model = vision_models.WHISPER_MODEL
-emotion_model = vision_models.EMOTION_MODEL
-emotion_processor = vision_models.EMOTION_PROCESSOR
+model = models.YOLO_FACE_MODEL
+landmark_detector = models.LANDMARK_DETECTOR
+stt_model = models.WHISPER_MODEL
+emotion_model = models.EMOTION_MODEL
+emotion_processor = models.EMOTION_PROCESSOR
 
 # Load user retriever model and processor
 user_retriever_config = get_face_embedding_model("ULIP-p16")
@@ -183,6 +184,7 @@ async def answer_question(
     answer, retrieved_features = generate_answer(question, current_session, context, conn, current_user, visual_profile)
     end_time = time.time()
     memory_thread.join()
+
 
     conn.close()
 

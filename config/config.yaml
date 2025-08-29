@@ -1,0 +1,17 @@
+# Memory Module Configuration
+memory: 
+  closed_vocabulary: True
+  vocabulary: 
+    - Personnalité
+    - Intérêts
+    - Emploi
+    - Education
+    - Famille
+    - Relations
+    - Loisirs
+    - Santé
+    - Emploi_du_temps
+    - Habitudes
+    - Alimentation
+
+  

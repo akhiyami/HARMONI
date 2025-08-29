@@ -6,7 +6,7 @@ Post-processing functions for detected faces grids.
 
 import numpy as np
 
-from vision.config.settings import FILTER_THRESHOLD
+from config.settings import FILTER_THRESHOLD
 
 #--------------------------------------- Functions ---------------------------------------#
 
@@ -64,39 +64,6 @@ def stitch_sequences(grid, sparsity, lips_landmarks_grid):
         current_row += 1
 
     return stitched_face_grid, stitched_sparsity, stitched_lips_landmarks_grid
-
-# def compute_speaking_probability(landmark_sequences, threshold=1.5):
-#     """
-#     Estimate speaking probability from mouth landmark motion.
-    
-#     Parameters:
-#         landmark_sequences: np.ndarray of shape [T, M, 2]
-#             - T = number of frames
-#             - M = number of mouth landmarks
-#             - Each entry is [x, y] coordinates
-#         threshold: float
-#             - Sensitivity threshold for motion magnitude to infer speaking
-    
-#     Returns:
-#         probs: list of floats, speaking probability per frame (T-1 entries)
-#     """
-#     landmark_sequences = np.array(landmark_sequences)  # shape [T, M, 2]
-#     T = landmark_sequences.shape[0]
-
-#     motion_magnitudes = []
-#     for t in range(1, T):
-#         #check landmarks values are not empty
-#         # Compute displacement of each landmark between frames
-#         diffs = landmark_sequences[t] - landmark_sequences[t - 1]  # shape [M, 2]
-#         distances = np.linalg.norm(diffs, axis=1)  # shape [M]
-#         mean_motion = np.mean(distances)
-#         motion_magnitudes.append(mean_motion)
-
-#     # Normalize and convert to probability (sigmoid-style)
-#     motion_magnitudes = np.array(motion_magnitudes)
-#     probs = 1 / (1 + np.exp(- (motion_magnitudes - threshold)))
-
-#     return probs.tolist()
 
 
 def compute_speaking_probability(landmark_sequences, smooth_window=3, threshold=0.02):

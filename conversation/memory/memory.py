@@ -104,11 +104,12 @@ def update_memory(new_memory_object, current_user, conn, database=None):
     new_primary_features = [item for item in primary_memory if item.type == "primary"]
 
     for item in new_primary_features:
-        cursor.execute(
-            f"UPDATE {current_user} SET value = ? WHERE name = ?",
-            ((";").join(item.value), item.name)
-        )
-        conn.commit()
+        if item.value:
+            cursor.execute(
+                f"UPDATE {current_user} SET value = ? WHERE name = ?",
+                ((";").join(item.value) if isinstance(item.value, (list, tuple)) else str(item.value), item.name)
+            )
+            conn.commit()
 
 
     # Update contextual features

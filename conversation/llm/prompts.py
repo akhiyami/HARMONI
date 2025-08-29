@@ -70,6 +70,7 @@ add_feature_prompt = {
 
         "Tu reçois :\n"
         "- Le nom d'une feature à ajouter à la mémoire de l'utilisateur. \n"
+        "- Tes dernières interactions avec l'utilisateur,\n"
         "- La dernière question de l'utilisateur,\n"
 
         "Ta mission est d'extraire l'information de cette question pour créer une feature claire, correspondant au nom demandé.\n\n"
@@ -92,6 +93,7 @@ modify_feature_prompt = {
 
         "Tu reçois :\n"
         "- une feature qui doit être modifiée, \n"
+        "- Tes dernières interactions avec l'utilisateur,\n"
         "- la dernière question de l'utilisateur,\n"
 
         "Ta mission est de mettre à jour la feature indiquée en fonction des nouvelles informations et des modifications identifiées. \n"

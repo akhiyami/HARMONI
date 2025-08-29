@@ -126,7 +126,7 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
 # MEMORY UPDATE FUNCTION #
 ##########################
 
-def update_memory_llm(user_question, conn=None, current_user=None, database=None):
+def update_memory_llm(user_question, conn=None, current_user=None, database=None, stm=None):
     """
     Appelle le LLM pour analyser l’échange et mettre à jour la mémoire.
     Args:
@@ -206,7 +206,6 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         messages=[
             feature_identification_prompt,
             ltm,
-            # *stm,
             {"role": "user", "content": f"Utilisateur : {user_question}"},
         ],
         response_format=FeaturesNames
@@ -233,12 +232,12 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
             messages=[
                 add_feature_prompt,
                 {"role": "user", "content": f"Le nom de la feature à ajouter est : {new_feature}."},
-                # *stm,
+                {"role": "user", "content": f"Dernières interactions : {stm}."},
                 {"role": "user", "content": f"Utilisateur : {user_question}"},
             ],
             response_format=LongTermMemory
         )
-        return add_feature.choices[0].message.parsed.features[0]
+        return add_feature.choices[0].message.parsed
 
     def modify_feature_task(feature_to_modify):
         modify_feature = client.beta.chat.completions.parse(
@@ -246,7 +245,7 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
             messages=[
                 modify_feature_prompt,
                 {"role": "user", "content": f"La feature à modifier est : {json.dumps(feature_to_modify, indent=2, ensure_ascii=False)}."},
-                # *stm,
+                {"role": "user", "content": f"Dernières interactions : {stm}."},
                 {"role": "user", "content": f"Utilisateur : {user_question}"},
             ],
             response_format=LongTermMemory
@@ -263,7 +262,8 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         # Collect add_feature results
         for future in concurrent.futures.as_completed(add_futures):
             new_feature_parsed = future.result()
-            updated_ltm.features.append(new_feature_parsed)
+            if new_feature_parsed.features:
+                updated_ltm.features.append(new_feature_parsed.features[0])
 
         # Collect modify_feature results
         for future in concurrent.futures.as_completed(modify_futures):

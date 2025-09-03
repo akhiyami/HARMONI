@@ -158,7 +158,7 @@ async def answer_question(
         conn_thread = sqlite3.connect(database)
 
         try:
-            new_memory_object = update_memory_llm(question, conn_thread, current_user)
+            new_memory_object = update_memory_llm(question, conn_thread, current_user, stm=current_session)
             global memory_user
             memory_user = update_memory(new_memory_object, current_user, conn_thread)
         finally:

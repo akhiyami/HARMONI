@@ -30,6 +30,7 @@ from insightface.model_zoo.model_zoo import get_model as insightface_get_model
 from config.utils import suppress_stdout
 
 ################
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 dotenv.load_dotenv()
 HF_TOKEN = os.getenv("HF_TOKEN")

@@ -14,4 +14,12 @@ memory:
     - Habitudes
     - Alimentation
 
-  
+#llm configuration
+reply-llm:
+  model: "gemma3:12b"
+  temperature: 0.7
+  max_tokens: -1
+memory-llm:
+  model: "gemma3:12b"
+  temperature: 0.7
+  max_tokens: -1

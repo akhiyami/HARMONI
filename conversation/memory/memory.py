@@ -118,11 +118,12 @@ def update_memory(new_memory_object, current_user, conn, database=None):
     new_features = [item for item in contextual_memory if item.type == "contextual"]
 
     for item in new_features:
-        # Check if the feature already exists based on the name
-        if item.name not in [feature[0] for feature in existing_features]:  # Feature does not exist
-            # Insert new feature into the user's memory
-            cursor.execute(
-                f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
+        if item.value:
+            # Check if the feature already exists based on the name
+            if item.name not in [feature[0] for feature in existing_features]:  # Feature does not exist
+                # Insert new feature into the user's memory
+                cursor.execute(
+                    f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
                 (item.type, item.name, item.description, (";").join(item.tags), (";").join(item.value))
             )
             conn.commit()

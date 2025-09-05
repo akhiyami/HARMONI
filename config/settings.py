@@ -28,7 +28,7 @@ DEVICE = 'mps' if torch.backends.mps.is_available() else 'cpu'
 
 # Frame buffer size
 LEN_FRAME_BUFFER = 15
-FRAME_STRIDE = 5  # Process every 5th frame to reduce computation
+FRAME_STRIDE = 5 # Process every n frame to reduce computation
 FILTER_THRESHOLD = 5  # Minimum number of frames to consider a face valid
 
 ##########

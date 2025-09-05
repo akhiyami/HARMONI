@@ -113,7 +113,7 @@
                 if (contextual.length > 0) {
                     if (primary.length > 0) html += "<br>----------<br>";
                     html += contextual.map(
-                        item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                        item => `<b>${item.name}:</b> </br>${item.value}`
                     ).join('<br>');
                 }
                 live_profile.innerHTML = html;
@@ -169,7 +169,7 @@
                             if (contextual.length > 0) {
                                 if (primary.length > 0) html += "<br>----------<br>";
                                 html += contextual.map(
-                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                    item => `<b>${item.name}:</b></br>${item.value}`
                                 ).join('<br>');
                             }
                             live_profile.innerHTML = html;

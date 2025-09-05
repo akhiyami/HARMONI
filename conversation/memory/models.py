@@ -41,22 +41,10 @@ class PrimaryFeature(BaseModel):
         ...,
         description="Décris la catégorie d'une caractéristique utilisateur (nom, âge, genre, préférence de dialogue)."
     )
-    description: None = Field(
-        None, 
-        description="Cette caractéristique est primaire et n'a pas besoin de description."
-    )
-    tags: None = Field(
-        None, 
-        description="Cette caractéristique est primaire et n'a pas besoin de tags."
-    )
     value: Optional[ValueListType] = Field(
         None, 
         description="Liste de valeurs associées à la caractéristique, pour représenter les différentes facettes ou aspects de cette caractéristique. Peut être None.",
         min_items=0
-    )
-    embeddings: None = Field(
-        None, 
-        description="Cette caractéristique est primaire et n'a pas besoin d'embeddings."
     )
 
 class ContextualFeature(BaseModel):
@@ -69,23 +57,10 @@ class ContextualFeature(BaseModel):
         pattern=pattern,
         description="Doit être un mot unique sans espaces ni caractères spéciaux, décrivant la catégorie d'une caractéristique utilisateur (par exemple: hobby, emploi, intérêts...)."
     )
-    description: str = Field(
-        ..., 
-        description="Description générale de la caractéristique, indépendante de sa valeur, pour donner plus de détails sur ce qu'elle représente."
-    )
-    tags: TagsListType = Field(
-        ..., 
-        description="Liste de mots-clés associés à la caractéristique, pour faciliter la recherche et le filtrage. Doit contenir entre 1 et 3 mots-clés.",
-        min_items=1
-    )
     value: ValueListType = Field(
         ..., 
         description="Liste de valeurs associées à la caractéristique, pour représenter les différentes facettes ou aspects de cette caractéristique.",
         min_items=1
-    )
-    embeddings: Optional[List[float]] = Field(
-        None, 
-        description="Représentation vectorielle de la caractéristique, utilisée pour la recherche sémantique et la similarité. Elle sera générée automatiquement plus tard."
     )
 
 # Define a type alias for Feature, which can be either PrimaryFeature or ContextualFeature

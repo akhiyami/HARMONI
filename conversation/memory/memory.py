@@ -33,7 +33,7 @@ def memory_retriever(user_id, conn):
     """  
     Retrieve the memory of a user from the database.
     This function fetches the user's memory as a list of dictionaries, each containing
-    the name, description, tags, and value of each memory object.
+    the name and value of each memory object.
     -----
     Args:
         user_id (str): The unique identifier for the user.
@@ -46,18 +46,16 @@ def memory_retriever(user_id, conn):
     
     # Retrieve the user's features from its table in the database
     cursor = conn.cursor()
-    cursor.execute(f"SELECT type, name, description, tags, value FROM {user_id}")
+    cursor.execute(f"SELECT type, name, value FROM {user_id}")
     rows = cursor.fetchall()
 
     # Format the retrieved data into a list of dictionaries
     memory = []
     for row in rows:
-        type, name, description, tags, value = row
+        type, name, value = row
         memory.append({
             "type": type,
             "name": name,
-            "description": description,
-            "tags": tags.split(";") if tags else [],
             "value": value
         })
     
@@ -96,8 +94,8 @@ def update_memory(new_memory_object, current_user, conn, database=None):
     for feature in ["nom", "age", "genre", "preference_dialogue"]:
         if feature not in existing_primary_features:
             cursor.execute(
-                f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-                ("primary", feature, None, None, '')
+                f"INSERT INTO {current_user} (type, name, value) VALUES (?, ?, ?)",
+                ("primary", feature, '')
             )
             conn.commit()
 
@@ -123,14 +121,14 @@ def update_memory(new_memory_object, current_user, conn, database=None):
             if item.name not in [feature[0] for feature in existing_features]:  # Feature does not exist
                 # Insert new feature into the user's memory
                 cursor.execute(
-                    f"INSERT INTO {current_user} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-                (item.type, item.name, item.description, (";").join(item.tags), (";").join(item.value))
-            )
+                    f"INSERT INTO {current_user} (type, name, value) VALUES (?, ?, ?)",
+                    (item.type, item.name, (";").join(item.value))
+                )
             conn.commit()
         else:  # Feature exists, update it
             cursor.execute(
-                f"UPDATE {current_user} SET description = ?, tags = ?, value = ? WHERE name = ?",
-                (item.description, (";").join(item.tags), (";").join(item.value), item.name)
+                f"UPDATE {current_user} SET value = ? WHERE name = ?",
+                ((";" ).join(item.value), item.name)
             )
             conn.commit()
     if new_conn:
@@ -227,14 +225,14 @@ def user_retriever(img, conn, model_config, database=None):
     )
 
     cursor.execute(
-        f"CREATE TABLE IF NOT EXISTS {new_user_id} (type TEXT, name TEXT, description TEXT, tags TEXT, value TEXT, embeddings BLOB)"
+        f"CREATE TABLE IF NOT EXISTS {new_user_id} (type TEXT, name TEXT, value TEXT)"
     )
 
     #create empty slots for the primary features
     for feature in ["nom", "age", "genre", "preference_dialogue"]:
         cursor.execute(
-            f"INSERT INTO {new_user_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-            ("primary", feature, None, None, ''),
+            f"INSERT INTO {new_user_id} (type, name, value) VALUES (?, ?, ?)",
+            ("primary", feature, ''),
         )
 
     user_memory = memory_retriever(new_user_id, conn)

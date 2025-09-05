@@ -25,7 +25,7 @@ sys.path.append(root_folder_path)
 from config.settings import API_KEY, LEN_HISTORY
 from memory.models import LongTermMemory, FeaturesNames
 from llm.prompts import qa_instructions, add_feature_prompt, modify_feature_prompt, reply_prompt, feature_identification_prompt
-from llm.retriever import features_values_retriever
+from llm.retriever import features_retriever
 
 # Initialize LLM client 
 client = OpenAI(api_key=API_KEY)
@@ -36,7 +36,7 @@ with open("config/config.yaml", "r") as file:
 reply_model = config.get("reply-llm", {}).get("model", "")
 memory_model = config.get("memory-llm", {}).get("model", "")
 
-if reply_model.startswith("gpt"):
+if reply_model.startswith("gpt") and "oss" not in reply_model:
     reply_client = OpenAI(api_key=API_KEY)
 else: 
     try:
@@ -44,7 +44,7 @@ else:
     except Exception as e:
         print(f"Error initializing local LLM client. Did you start the Ollama server?\nException: {e}")
 
-if memory_model.startswith("gpt"):
+if memory_model.startswith("gpt") and "oss" not in memory_model:
     memory_client = OpenAI(api_key=API_KEY)
 else: 
     try:
@@ -59,7 +59,7 @@ else:
 # ANSWER GENERATION FUNCTION #
 ##############################
 
-def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None, verbose=True):
+def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None, reply_prompt=reply_prompt, verbose=True):
     """
     Ask the LLM a question and retrieve the answer along with updated memory.
     This function prepares the context and session history, retrieves relevant features from the user's memory,
@@ -81,7 +81,7 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
 
     # retrieved only pertinent informations from long term memory
     now = time.time()
-    retrieved_memory = features_values_retriever(question, conn=conn, user_id=current_user)
+    retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
     retrival_time = time.time() - now
     retrieved_features_names = [feature["name"] for feature in retrieved_memory]
     if verbose:
@@ -94,8 +94,6 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
             retrieved_memory.insert(4, {
                 "type": "contextual",
                 "name": "emotion",
-                "description": "The detected emotion of the user.",
-                "tags": ["emotion"],
                 "value": [emotion]
             })
 
@@ -194,30 +192,26 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         feature = {
             "type": "primary",
             "name": name,
-            "description": None,
-            "tags": None,
             "value": value.split(";") if value else []
         }
         ltm["primary_features"].append(feature)
 
     # Add the contextual features
-    cursor.execute(f"SELECT name, description, tags, value FROM {current_user} WHERE type = 'contextual'")
+    cursor.execute(f"SELECT name, value FROM {current_user} WHERE type = 'contextual'")
     rows = cursor.fetchall()
     for row in rows:    
-        name, description, tags, value = row
+        name, value = row
         feature = {
             "type": "contextual",
             "name": name,
-            "description": description,
-            "tags": tags.split(";") if tags else [],
             "value": value.split(";") if value else []
         }
         ltm["features"].append(feature)
 
     # Format the long term memory for the LLM
-    ltm ={
-        "role": "system", 
-         "content": [{ 
+    ltm = {
+        "role": "system",
+        "content": [{
             "type": "text",
             "text": json.dumps(ltm, indent=2, ensure_ascii=False)  # ensure_ascii=False preserves characters like "é"
         }]
@@ -242,10 +236,13 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
     new_features = [new_feature.name for new_feature in new_features]
     modified_features = features_names.Modify
 
+    print("ADD:", new_features)
+    print("MODIFY:", modified_features)
+
     #look for the features to modify in db
     to_modify_features = []
     for feature in modified_features:
-        cursor.execute(f"SELECT type, name, description, tags, value FROM {current_user} WHERE name = ?", (feature,))
+        cursor.execute(f"SELECT type, name, value FROM {current_user} WHERE name = ?", (feature,))
         to_modify_features = cursor.fetchall()
 
     updated_ltm = LongTermMemory(primary_features=[], features=[])

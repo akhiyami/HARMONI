@@ -66,51 +66,5 @@ def stitch_sequences(grid, sparsity, lips_landmarks_grid):
     return stitched_face_grid, stitched_sparsity, stitched_lips_landmarks_grid
 
 
-def compute_speaking_probability(landmark_sequences, smooth_window=3, threshold=0.02):
-    """
-    Estimate speaking probability using MAR, assuming only mouth landmarks [48:68] are passed.
 
-    Parameters:
-        landmark_sequences: np.ndarray of shape [T, 20, 2]
-            - T = number of frames
-            - 20 mouth landmarks (indices correspond to 48–67 in dlib)
-        smooth_window: int
-            - Rolling window size for temporal smoothing
-        threshold: float
-            - Sensitivity for MAR change above baseline
 
-    Returns:
-        probs: list of floats, speaking probability per frame
-    """
-    landmarks = np.array(landmark_sequences)  # [T, 20, 2]
-    T = landmarks.shape[0]
-
-    mar_values = []
-    for t in range(T):
-        mouth = landmarks[t]
-
-        # MAR as defined in Soukupová & Čech (2016)
-        A = np.linalg.norm(mouth[3] - mouth[9])   # top lip (51) to bottom lip (57)
-        B = np.linalg.norm(mouth[5] - mouth[11])  # top lip (53) to bottom lip (59)
-        C = np.linalg.norm(mouth[1] - mouth[7])   # left corner (49) to right corner (55)
-
-        mar = (A + B) / (2.0 * C + 1e-6)
-        mar_values.append(mar)
-
-    mar_values = np.array(mar_values)
-
-    # Smooth over time
-    if smooth_window > 1:
-        kernel = np.ones(smooth_window) / smooth_window
-        mar_smooth = np.convolve(mar_values, kernel, mode='same')
-    else:
-        mar_smooth = mar_values
-
-    # Estimate baseline (closed mouth MAR)
-    baseline = np.percentile(mar_smooth, 10)
-    mar_delta = mar_smooth - baseline
-
-    # Convert to probability (sigmoid)
-    probs = 1 / (1 + np.exp(- (mar_delta - threshold) * 50))
-
-    return probs.tolist()

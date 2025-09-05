@@ -94,11 +94,9 @@ async def set_video(video: UploadFile = File(...)):
         shutil.copyfileobj(video.file, tmp)
         tmp_path = tmp.name
 
-    # Now you can open the video using OpenCV
-    cap = cv2.VideoCapture(tmp_path)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
+        future_face = executor.submit(detect_speaking_face, tmp_path, model, landmark_detector, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, tmp_path, stt_model)
 
         speaking_face_row, grid, probs = future_face.result()
@@ -282,13 +280,11 @@ async def edit_user(
 
     # Insert the new profile data
     for feature in profile_dict:
-        tags_list = feature.get("tags", [])
-        tags = ';'.join(tags_list) if isinstance(tags_list, list) else tags_list
         values_list = feature.get("value", [])
         value = ';'.join(values_list) if isinstance(values_list, list) else values_list
         cursor.execute(
-            f"INSERT INTO {user_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-            (feature.get("type"), feature.get("name"), feature.get("description"), tags, value),
+            f"INSERT INTO {user_id} (type, name, value) VALUES (?, ?, ?)",
+            (feature.get("type"), feature.get("name"), value),
         )
 
     conn.commit()

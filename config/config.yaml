@@ -16,10 +16,10 @@ memory:
 
 #llm configuration
 reply-llm:
-  model: "gemma3:12b"
+  model: "gpt-4o"
   temperature: 0.7
   max_tokens: -1
 memory-llm:
-  model: "gemma3:12b"
+  model: "gpt-4o"
   temperature: 0.7
   max_tokens: -1

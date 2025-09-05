@@ -51,15 +51,15 @@ def initialize_speaker_tables(speaker_a, speaker_b, speaker_a_id, speaker_b_id, 
 
     for speaker_id, name in zip([speaker_a_id, speaker_b_id], [speaker_a, speaker_b]):
         cursor.execute(
-        f"CREATE TABLE IF NOT EXISTS {speaker_id} (type TEXT, name TEXT, description TEXT, tags TEXT, value TEXT, embeddings BLOB)"
+        f"CREATE TABLE IF NOT EXISTS {speaker_id} (type TEXT, name TEXT, value TEXT)"
     )
 
         #create empty slots for the primary features
         for feature in ["nom", "age", "genre", "preference_dialogue"]:
             value = name if feature == "nom" else None
             cursor.execute(
-            f"INSERT INTO {speaker_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-            ("primary", feature, None, None, value),
+            f"INSERT INTO {speaker_id} (type, name, value) VALUES (?, ?, ?)",
+            ("primary", feature, value),
         )
 
     conn.commit()
@@ -158,8 +158,8 @@ def process_speaker_interactions(
         for feature in ["nom", "age", "genre", "preference_dialogue"]:
             value = speaker_name if feature == "nom" else None
             cursor.execute(
-            f"INSERT INTO {speaker_id} (type, name, description, tags, value) VALUES (?, ?, ?, ?, ?)",
-            ("primary", feature, None, None, value),
+            f"INSERT INTO {speaker_id} (type, name, value) VALUES (?, ?, ?)",
+            ("primary", feature, value),
         )
         
         conn.commit()

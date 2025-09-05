@@ -108,15 +108,6 @@
                 </div>
                 <input type="hidden" id="feature-values" name="feature-values" required>
 
-                <label for="feature-description">Description:</label>
-                <textarea id="feature-description" name="feature-description" placeholder="Type feature description here..."></textarea>
-
-                <label for="feature-tags">Tags:</label>
-                <div class="pill-container" id="tags-container">
-                    <input type="text" id="feature-tags-input" placeholder="Type tag and press space">
-                </div>
-                <input type="hidden" id="feature-tags" name="feature-tags">
-
                 <div class="window_buttons">
                     <button type="submit" id="save-feature-btn" class="green_button">Save Feature</button>
                     <button type="button" id="cancel-feature-btn" class="grey_button">Cancel</button>
@@ -277,7 +268,7 @@
                             if (contextual.length > 0) {
                                 if (primary.length > 0) html += "<br>----------<br>";
                                 html += contextual.map(
-                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                    item => `<b>${item.name}:</b> </br>${item.value}`
                                 ).join('<br>');
                             }
                             live_profile.innerHTML = html;
@@ -330,7 +321,7 @@
                             if (contextual.length > 0) {
                                 if (primary.length > 0) html += "<br>----------<br>";
                                 html += contextual.map(
-                                    item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} </br><em><span style="color:blue">${item.tags.join(', ')}</span></em>`
+                                    item => `<b>${item.name}:</b> </br>${item.value}`
                                 ).join('<br>');
                             }
                             live_profile.innerHTML = html;
@@ -479,10 +470,6 @@
                             if (index === 0) {
                                 item.name = cell.textContent;
                             } else if (index === 1) {
-                                item.description = cell.textContent;
-                            } else if (index === 2) {
-                                item.tags = cell.textContent.split(',').map(tag => tag.trim());
-                            } else if (index === 3) {
                                 item.value = cell.textContent.split(',').map(value => value.trim());
                             }
                         });
@@ -808,8 +795,6 @@
             // Values: trigger on Enter
             setupPillInput("values-container", "feature-values-input", "feature-values", ["Enter"]);
 
-            // Tags: trigger on space or comma
-            setupPillInput("tags-container", "feature-tags-input", "feature-tags", [" ", ","]);
 
             document.getElementById("add-feature-form").addEventListener("keydown", function (e) {
                 if (e.key === "Enter") {
@@ -820,14 +805,10 @@
             document.getElementById("add-feature-form").addEventListener("submit", function (e) {
                 e.preventDefault();
                 console.log("Feature Name:", document.getElementById("feature-name").value);
-                console.log("Values:", document.getElementById("feature-values").value.split(","));
-                console.log("Description:", document.getElementById("feature-description").value);
-                console.log("Tags:", document.getElementById("feature-tags").value.split(","));
+                console.log("Values:", document.getElementById("feature-values").value.split(","));     
                 const newRow = document.createElement("tr");
                 newRow.innerHTML = `
                     <td>${document.getElementById("feature-name").value}</td>
-                    <td>${document.getElementById("feature-description").value}</td>
-                    <td>${document.getElementById("feature-tags").value}</td>
                     <td>${document.getElementById("feature-values").value}</td>
                 `;
                 document.getElementById("features-table").appendChild(newRow);
@@ -836,7 +817,6 @@
                 document.getElementById("add-feature-form").reset();
                 // reset pill containers
                 document.getElementById("values-container").innerHTML = '<input type="text" id="feature-values-input" placeholder="Type value and press Enter">';
-                document.getElementById("tags-container").innerHTML = '<input type="text" id="feature-tags-input" placeholder="Type tag and press Enter">';
                 document.getElementById("features-table").scrollIntoView({ behavior: "smooth" });
             });
 
@@ -846,7 +826,6 @@
                 document.getElementById("add-feature-form").reset();
                 // reset pill containers
                 document.getElementById("values-container").innerHTML = '<input type="text" id="feature-values-input" placeholder="Type value and press Enter">';
-                document.getElementById("tags-container").innerHTML = '<input type="text" id="feature-tags-input" placeholder="Type tag and press Enter">';
             });
         });
 

@@ -16,7 +16,8 @@ import cv2
 root_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_folder_path)
 
-from vision.post_processing import remove_outliers, stitch_sequences, compute_speaking_probability 
+from vision.post_processing import remove_outliers, stitch_sequences
+from vision.audio import extract_audio, load_audio_wav, run_vad
 from config.settings import LEN_FRAME_BUFFER, FRAME_STRIDE
 
 #--------------------------------------- Functions ---------------------------------------#
@@ -61,7 +62,7 @@ def recognize_face(current_faces, new_face):
             return i        
     return None
 
-def get_lips_landmarks(img, landmark_detector):
+def get_landmarks(img, landmark_detector):
     """
     Get the landmarks for the lips from a face image.
     Args:
@@ -72,56 +73,13 @@ def get_lips_landmarks(img, landmark_detector):
     """
     
     landmarks = landmark_detector(img, dlib.rectangle(0, 0, img.shape[1], img.shape[0]))
-    landmarks_list = [[point.x, point.y] for point in landmarks.parts()[48:68]]  # Get the landmarks for the mouth (indices 48 to 67)
+    landmarks_list = [[point.x, point.y] for point in landmarks.parts()]  # Get all landmarks
 
-    rotated_ld = rotate_landmarks_horizontal(landmarks_list)
-    centered_ld = center_landmarks(rotated_ld)
-    
-    return centered_ld
-        
-
-def rotate_landmarks_horizontal(landmarks):
-    """
-    Rotates landmarks so that the line between landmark 0 and 6 is horizontal.
-    The rotation is around landmark 0, and landmark 0 will be at (0, 0).
-    """
-    landmarks = np.array(landmarks)
-    anchor = landmarks[0]
-    target = landmarks[6]
-    
-    # Vector from landmark 0 to landmark 6
-    vec = target - anchor
-    dx, dy = vec
-
-    # Compute angle to horizontal
-    angle = -np.arctan2(dy, dx)  # negative to rotate clockwise
-
-    # Rotation matrix
-    rotation_matrix = np.array([
-        [np.cos(angle), -np.sin(angle)],
-        [np.sin(angle),  np.cos(angle)]
-    ])
-
-    # Translate landmarks to make landmark 0 the origin
-    translated = landmarks - anchor
-
-    # Apply rotation
-    rotated = translated @ rotation_matrix.T  # [N,2] x [2,2]
-
-    return rotated
-
-def center_landmarks(landmarks):
-    """
-    Translate landmarks so the abscissa of landmark 3 is 0
-    """
-    landmarks = np.array(landmarks)
-    landmark_3 = landmarks[3]
-    centered_landmarks = landmarks - [landmark_3[0], 0]
-    return centered_landmarks
+    return landmarks_list
 
 # speaking face detection 
 
-def detect_speaking_face(cap, model, landmark_detector, save_frames=False, verbose=True):
+def detect_speaking_face(video_file, model, landmark_detector, save_frames=False, verbose=True):
     """
     Detect speaking faces in a video stream using YOLOv8 and Dlib.
     Args:
@@ -134,6 +92,8 @@ def detect_speaking_face(cap, model, landmark_detector, save_frames=False, verbo
     """
     frames_stack, current_faces, face_images = [], [], []
     i = 0
+
+    cap = cv2.VideoCapture(video_file)
 
     while True:  # Read frames from the video
         ret, frame = cap.read()
@@ -149,15 +109,21 @@ def detect_speaking_face(cap, model, landmark_detector, save_frames=False, verbo
     # Release the video capture object
     cap.release()
 
+    # audio_file = "temp_audio.wav"
+    # extract_audio(video_file, audio_file)
+
+    # audio_bytes, audio_arr, sr = load_audio_wav("temp_audio.wav")
+    # audio_flags = run_vad(audio_bytes, sample_rate=sr)
+
     # Process the frames stack to create a grid of faces (each row corresponds to a frame and each column to a face)
-    face_grid, sparsity, lips_landmarks_grid = build_face_grids(frames_stack, landmark_detector)
+    face_grid, sparsity, landmarks_grid = build_face_grids(frames_stack, landmark_detector)
 
     # Post-process the grids to remove outliers and stitch sequences
-    face_grid, sparsity, lips_landmarks_grid = remove_outliers(face_grid, sparsity, lips_landmarks_grid)
-    face_grid, sparsity, lips_landmarks_grid = stitch_sequences(face_grid, sparsity, lips_landmarks_grid)
+    face_grid, sparsity, landmarks_grid = remove_outliers(face_grid, sparsity, landmarks_grid)
+    face_grid, sparsity, landmarks_grid = stitch_sequences(face_grid, sparsity, landmarks_grid)
 
     # Process the face grid to compute the speaking probability for each face
-    speaking_user, speaking_probs = identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames, verbose)
+    speaking_user, speaking_probs = identify_speaking_face(face_grid, sparsity, landmarks_grid, save_frames, verbose)
 
     # Extract and return speaking face row
     face_row = face_grid[:, speaking_user]
@@ -234,7 +200,7 @@ def build_face_grids(frames_stack, landmark_detector):
 
     face_grid = np.zeros((n_frames, n_faces), dtype=object)
     sparsity = np.zeros((n_frames, n_faces), dtype=bool)  # Indicates if face is detected in a frame
-    lips_landmarks_grid = np.zeros((n_frames, n_faces), dtype=object)
+    landmarks_grid = np.zeros((n_frames, n_faces), dtype=object)
 
     # Fill the grids
     for i, frames in enumerate(frames_stack):
@@ -242,14 +208,126 @@ def build_face_grids(frames_stack, landmark_detector):
             if key in frames:
                 face_grid[i, j] = frames[key]
                 sparsity[i, j] = True
-                lips_landmarks_grid[i, j] = get_lips_landmarks(np.array(face_grid[i, j]), landmark_detector)
+                landmarks_grid[i, j] = get_landmarks(np.array(face_grid[i, j]), landmark_detector)
             else:
                 face_grid[i, j] = Image.fromarray(np.zeros((100, 100, 3), dtype=np.uint8))
 
-    return face_grid, sparsity, lips_landmarks_grid
+    return face_grid, sparsity, landmarks_grid
 
 
-def identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames, verbose=True):
+def lip_activity_series(landmark_sequence, smooth_window=5):
+    """Same as before: returns per-frame lip motion energy."""
+    lm = np.asarray(landmark_sequence)
+    T = lm.shape[0]
+    mouth = lm[:, :, :]  # already cropped to mouth [20,2] or full [68,2]
+
+    openness = []
+    for t in range(T):
+        if mouth.shape[1] == 20:
+            m = mouth[t]
+            A = np.linalg.norm(m[3] - m[9])
+            B = np.linalg.norm(m[5] - m[11])
+            C = np.linalg.norm(m[1] - m[7]) + 1e-6
+            openness.append((A + B) / (2 * C))
+        else:
+            m = mouth[t][48:68]
+            A = np.linalg.norm(m[3] - m[9])
+            B = np.linalg.norm(m[5] - m[11])
+            C = np.linalg.norm(m[1] - m[7]) + 1e-6
+            openness.append((A + B) / (2 * C))  
+    openness = np.array(openness)
+
+    # Motion = derivative
+    diff = np.abs(np.diff(openness, prepend=openness[0]))
+    if smooth_window > 1:
+        k = np.ones(smooth_window) / smooth_window
+        diff = np.convolve(diff, k, mode="same")
+    return diff
+
+def assign_speaker_probabilities(audio_flags, face_landmarks):
+    """
+    audio_flags: [T_audio] 0/1 speech per short frame (e.g., 30 ms)
+    face_landmarks: list of [T_video, 20, 2] arrays (all same T_video)
+    Returns: list of [T_video] arrays, one per face
+    """
+    N = len(face_landmarks)
+    T_video = face_landmarks[0].shape[0]
+
+    # Step 1. Compute per-face motion
+    activities = [lip_activity_series(seq) for seq in face_landmarks]
+    A = np.stack(activities, axis=1)  # [T_video, N]
+
+    # Step 2. Resample audio_flags to video length
+    audio_flags_resampled = np.interp(
+        np.linspace(0, len(audio_flags), T_video),
+        np.arange(len(audio_flags)), audio_flags
+    )
+
+    # Step 3. Normalize activities across faces
+    probs = A / (A.sum(axis=1, keepdims=True) + 1e-6)
+
+    # Step 4. Gate with audio
+    probs = probs * audio_flags_resampled[:, None]
+
+    return [probs[:, i] for i in range(N)]
+
+
+def compute_speaking_probability(landmark_sequences, smooth_window=3, alpha=200, motion_thresh=0.005):
+    """
+    Estimate speaking probability using normalized MAR dynamics.
+
+    Parameters:
+        landmark_sequences: np.ndarray of shape [T, 68, 2]
+            - T = number of frames
+            - 68 facial landmarks (dlib indexing)
+        smooth_window: int
+            - Rolling window size for temporal smoothing
+        alpha: float
+            - Sharpness of sigmoid
+        motion_thresh: float
+            - Sensitivity threshold for MAR change
+
+    Returns:
+        probs: list of floats, speaking probability per frame
+    """
+    landmarks = np.array(landmark_sequences)  # [T, 68, 2]
+    T = landmarks.shape[0]
+
+    mar_values = []
+    for t in range(T):
+        face = landmarks[t]
+        mouth = face[48:68]
+
+        # MAR definition
+        A = np.linalg.norm(mouth[3] - mouth[9])   # 51-57
+        B = np.linalg.norm(mouth[5] - mouth[11])  # 53-59
+        C = np.linalg.norm(mouth[1] - mouth[7])   # 49-55
+        mar = (A + B) / (2.0 * C + 1e-6)
+
+        # Normalize by inter-ocular distance (36–45)
+        eye_dist = np.linalg.norm(face[36] - face[45])
+        mar /= (eye_dist + 1e-6)
+
+        mar_values.append(mar)
+
+    mar_values = np.array(mar_values)
+
+    # Smooth MAR
+    kernel = np.ones(smooth_window) / smooth_window
+    mar_smooth = np.convolve(mar_values, kernel, mode='same')
+
+    # Temporal dynamics (MAR variation)
+    mar_diff = np.abs(np.diff(mar_smooth, prepend=mar_smooth[0]))
+    motion_energy = np.convolve(mar_diff, kernel, mode='same')
+
+    # Speaking probability from dynamics
+    probs = 1 / (1 + np.exp(-alpha * (motion_energy - motion_thresh)))
+
+    return probs.tolist()
+
+
+
+def identify_speaking_face(face_grid, sparsity, landmarks_grid, save_frames, verbose=True):
     """
     Identify the speaking face based on the computed speaking probabilities.
     Args:
@@ -262,16 +340,17 @@ def identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames
         int: Index of the speaking face.
         list: List of speaking probabilities for each face.
     """
-    probs = []
-
+    mean_probs = []
+    # landmarks_sequences = []
+    
     for i in range(face_grid.shape[1]):
         face_row = face_grid[:, i]
         sparsity_row = sparsity[:, i]
-        lips_row = lips_landmarks_grid[:, i]
+        landmarks_row = landmarks_grid[:, i]
 
         # Keep only frames where face is detected
         valid_faces = [f for f, s in zip(face_row, sparsity_row) if s]
-        valid_lips = [l for l, s in zip(lips_row, sparsity_row) if s]
+        valid_landmarks = [l for l, s in zip(landmarks_row, sparsity_row) if s]
 
         if save_frames:
             subfolder_path = os.path.join("results", f"{i}")
@@ -279,16 +358,24 @@ def identify_speaking_face(face_grid, sparsity, lips_landmarks_grid, save_frames
             for j, img in enumerate(valid_faces):
                 img.save(os.path.join(subfolder_path, f'frame_{j:04d}.png'))
 
-        prob_face = compute_speaking_probability(valid_lips)
+        prob_face = compute_speaking_probability(valid_landmarks)
         mean_prob = np.mean(prob_face)
         if verbose:
             print(f"Face {i}: Mean speaking probability = {mean_prob:.2f}")
 
-        probs.append(mean_prob)
+        mean_probs.append(mean_prob)
 
-    speaking_user = np.argmax(probs)
+        # landmarks_sequences.append(np.array(valid_landmarks))
+
+    # probs = assign_speaker_probabilities(audio_flags, landmarks_sequences)  # assuming continuous speech
+    # mean_probs = [np.mean(p) for p in probs]
+
+    speaking_user = np.argmax(mean_probs)
     if verbose:
         print("\nProcessing complete. Results saved in 'results' folder.")
-        print(f"The speaker is the person number {speaking_user}, with a speaking probability of {probs[speaking_user]:.2f}.")
+        print(f"The speaker is the person number {speaking_user}, with a speaking probability of {mean_probs[speaking_user]:.2f}")
 
-    return speaking_user, probs
+    return speaking_user, mean_probs
+
+
+

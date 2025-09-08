@@ -56,9 +56,11 @@ landmark_detector = models.LANDMARK_DETECTOR
 stt_model = models.WHISPER_MODEL
 emotion_model = models.EMOTION_MODEL
 emotion_processor = models.EMOTION_PROCESSOR
+insightface_model = models.INSIGHTFACE_MODEL
 
 # Load user retriever model and processor
-user_retriever_config = get_face_embedding_model("ULIP-p16")
+user_retriever_config = get_face_embedding_model("INSIGHTFACE")
+
 
 # Database connection for user retrieval
 database = 'users.db'
@@ -96,7 +98,7 @@ async def set_video(video: UploadFile = File(...)):
 
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_face = executor.submit(detect_speaking_face, tmp_path, model, landmark_detector, save_frames=True)
+        future_face = executor.submit(detect_speaking_face, tmp_path, model, insightface_model, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, tmp_path, stt_model)
 
         speaking_face_row, grid, probs = future_face.result()

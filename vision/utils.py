@@ -66,5 +66,21 @@ def stitch_sequences(grid, sparsity, lips_landmarks_grid):
     return stitched_face_grid, stitched_sparsity, stitched_lips_landmarks_grid
 
 
-
+def _mouth_from_landmarks(lm):
+    """
+    lm: np.array shape (M,2) with M >= 20 (mouth-only or full 68)
+    returns a (20,2) mouth array
+    """
+    arr = np.asarray(lm, dtype=np.float32)
+    if arr.ndim != 2 or arr.shape[1] != 2:
+        raise ValueError(f"landmarks must be (M,2), got shape {arr.shape}")
+    if arr.shape[0] == 20:
+        return arr.copy()
+    elif arr.shape[0] >= 68:
+        return arr[48:68].copy()
+    else:
+        # fallback: if the array is weird size, try to return last 20 rows
+        if arr.shape[0] >= 20:
+            return arr[-20:].copy()
+        raise ValueError(f"unsupported landmark size: {arr.shape[0]}")
 

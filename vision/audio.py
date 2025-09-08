@@ -9,6 +9,7 @@ import whisper
 from moviepy import VideoFileClip
 import os
 from datasets import Audio
+from scipy.io import wavfile
 
 import webrtcvad
 
@@ -77,3 +78,17 @@ def run_vad(audio_bytes, sample_rate=16000, frame_ms=30, mode=2):
             break
         flags.append(int(vad.is_speech(frame, sample_rate)))
     return np.array(flags)  # shape [T_audio]
+
+
+def get_waveform(audio_path):
+    sample_rate, data = wavfile.read(audio_path)
+
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+
+    # Normalize to [-1, 1] if int16
+    if data.dtype == np.int16:
+        data = data.astype(np.float32) / 32768.0
+
+    x, y = np.arange(len(data)) / sample_rate, data
+    return x, y

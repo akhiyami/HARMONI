@@ -4,6 +4,9 @@ import sys
 import re
 import json
 import sqlite3
+from pydantic import BaseModel
+import yaml
+import time
 
 import dotenv
 
@@ -15,7 +18,7 @@ from sentence_transformers import SentenceTransformer, util
 
 from openai import OpenAI
 
-root_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+root_folder_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(root_folder_path)
 
 from conversation.llm.openai_inferences import update_memory_llm
@@ -24,10 +27,60 @@ from conversation.memory.memory import update_memory
 conn = sqlite3.connect("locomo.db")
 
 dotenv.load_dotenv()
+API_KEY = os.getenv("OPENAI_API_KEY")
 
-openai_api_key = os.getenv("OPENAI_API_KEY")
+config_path = os.path.join(root_folder_path, 'config', 'config.yaml')
+config = yaml.safe_load(open(config_path))
 
-client = OpenAI(api_key=openai_api_key)
+client = OpenAI(api_key=API_KEY)
+
+judge_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+judge_model = "mixtral"
+
+
+# --- System prompt for LLM-as-judge ---
+PROMPT_JUDGE_SYSTEM_FEATURE = {
+    "role": "system",
+    "content": (
+        "Tu es un évaluateur expert en profilage d'utilisateur. \n"
+        "Tu dois évaluer les features extraites d'une interaction avec un utilisateur à l'aide d'un score de 0 à 10 "
+        "(0 = totalement incorrect, 10 = parfaitement correct). \n"
+        "Pour évaluer une feature ou liste de features, tu te baseras d'une observation faite à l'issue d'une interaction de l'utilisateur.\n"
+        "Les features à évaluer seront de la forme : [nom de la feature]: [valeur extraite], et l'observation  sous la forme d'une phrase en language naturelle.\n"
+        "Par exemple, dans le cas où l'interaction est 'Je suis arrivé au tennis en retard pour la première fois ce samedi', "
+        "et que l'observation est 'Jean fait du tennis le samedi', "
+        "la feature 'Hobby : Joue au tennis le samedi' devra recevoir un score élevé ; "
+        "la feature 'Personalité : Est fréquemment en retard' devra recevoir un score faible. \n"
+        "Retourne uniquement le score sous la forme d'un entier entre 0 et 10."
+    ),
+}
+
+PROMPT_CONTENT_FEATURE = """
+    Interaction : {interaction}
+    Référence : {reference}
+    À évaluer : {to_evaluate}
+"""
+
+PROMPT_JUDGE_SYSTEM_PROFILE = {
+    "role": "system",
+    "content": (
+        "Tu es un évaluateur expert en profilage d'utilisateur. \n"
+        "Tu dois évaluer le profil de l'utilisateur à l'aide d'un score de 0 à 10."
+        "(0 = totalement incorrect, 10 = parfaitement correct). \n"
+        "Tu te baseras sur une paragraphe de description de l'utilisateur pour formuler ton évaluation."
+        "Pour une meilleure comparaison, le profil extrait à évaluer à aussi été formulé sous la forme d'un paragraphe de description.\n"
+        "Ta note devra refléter la précision et la pertinence de ce profil par rapport à la description fournie. \n"
+        "Retourne uniquement le score sous la forme d'un entier entre 0 et 10."
+    ),
+}
+
+PROMPT_CONTENT_PROFILE = """
+    Référence : {reference}
+    À évaluer : {to_evaluate}
+"""
+
+class JudgeResponseFormat(BaseModel):
+    score: int
 
 
 def generate_gpt(question):
@@ -41,6 +94,42 @@ def generate_gpt(question):
         ]
     )
     return response.choices[0].message.content
+
+
+def evaluate_feature_with_llm(question, reference, to_evaluate):
+    """
+    Uses GPT API to score both answers (0-10) and generate reasoning, given chosen/rejected examples.
+    """
+    prompt_content = PROMPT_CONTENT_FEATURE.format(
+        interaction=question,
+        reference=reference,
+        to_evaluate=to_evaluate
+    )
+
+    response = judge_client.chat.completions.parse(
+        model=judge_model,
+        messages=[PROMPT_JUDGE_SYSTEM_FEATURE, {"role": "user", "content": prompt_content}],
+        response_format=JudgeResponseFormat
+    )
+
+    return response.choices[0].message.parsed
+
+def evaluate_profile_with_llm(reference, to_evaluate):
+    """
+    Uses GPT API to score both answers (0-10) and generate reasoning, given chosen/rejected examples.
+    """
+    prompt_content = PROMPT_CONTENT_PROFILE.format(
+        reference=reference,
+        to_evaluate=to_evaluate
+    )
+
+    response = judge_client.chat.completions.parse(
+        model=judge_model,
+        messages=[PROMPT_JUDGE_SYSTEM_PROFILE, {"role": "user", "content": prompt_content}],
+        response_format=JudgeResponseFormat
+    )
+
+    return response.choices[0].message.parsed
 
 def initialize_speaker_tables(speaker_a, speaker_b, speaker_a_id, speaker_b_id, conn):
     cursor = conn.cursor()
@@ -110,10 +199,14 @@ def process_speaker_interactions(
         stm.append({"role": "assistant", "content": f"{other_interactions[0][0]}"})
         other_interactions.pop(0)
 
+    mean_update_time = 0
     for question, dia_id in tqdm(speaker_interactions, desc="Processing interactions", leave=False):
         # Update memory
+        start_time = time.time()
         new_memory_blob = update_memory_llm(question, conn=conn, current_user=speaker_id)
         memory_user = update_memory(new_memory_blob, speaker_id, conn)
+        memory_update_time = time.time() - start_time
+        mean_update_time += memory_update_time
 
         features = new_memory_blob.primary_features + new_memory_blob.features
 
@@ -122,7 +215,7 @@ def process_speaker_interactions(
         observations_session_llm += [f"Nom: {speaker_name}"]
 
         observations_session_llm += [
-            f"{feature.name}: {feature.value}"
+            [f"{feature.name}: {feature.value}", dia_id]
             for feature in features if feature.value
         ]
 
@@ -140,12 +233,19 @@ def process_speaker_interactions(
                     observation_turn = observation_turn[0]
 
                 # Compute ROUGE
-                rouge_scores.append(rouge_score.get_scores(observation_llm, observation_turn))
+                if observation_llm:
+                    rouge_scores.append(rouge_score.get_scores(observation_llm, observation_turn))
 
-                # Compute similarity
-                emb1 = model.encode(observation_llm, convert_to_tensor=True)
-                emb2 = model.encode(observation_turn, convert_to_tensor=True)
-                turn_similarity.append(util.cos_sim(emb1, emb2).item())
+                    # LLM-based evaluation of features
+                    feature_list = [f"{feature.name}: {feature.value}" for feature in features if feature.value]
+                    to_evaluate = "; ".join(feature_list)
+                    score = evaluate_feature_with_llm(
+                        question, observation_turn, to_evaluate=to_evaluate
+                    )
+                    turn_similarity.append(score.score)
+                else:
+                    missed_observations += len(observation_turn) if isinstance(observation_turn, list) else 1
+                
 
         elif observation_turn:
             missed_observations += 1
@@ -176,7 +276,7 @@ def process_speaker_interactions(
         
         conn.commit()
 
-        
+    mean_update_time /= len(speaker_interactions) if speaker_interactions else 1 
 
     return {
         "rouge_scores": rouge_scores,
@@ -184,23 +284,25 @@ def process_speaker_interactions(
         "observations_session_llm": observations_session_llm,
         "n_observations_llm": n_observations_llm,
         "missed_observations": missed_observations,
-        "memory_user": memory_user
+        "memory_user": memory_user,
+        "mean_update_time": mean_update_time
     }
 
 
-def summarize_session(session, observations, observations_session_llm, model):
+def summarize_session(observations, observations_session_llm, model):
     """Generate GPT summaries and compute session-level similarity."""
     session_observations_gold = ".\n".join([obs[0] for obs in observations])
-    session_observations_llm = ".\n".join(observations_session_llm)
+    session_observations_llm = ".\n".join([obs[0] for obs in observations_session_llm])
 
     prompt = "Ecris une courte présentation de l'individu décrit par ces observations: {}"
     description_gold = generate_gpt(prompt.format(session_observations_gold))
     description_llm = generate_gpt(prompt.format(session_observations_llm))
 
-    emb1 = model.encode(description_gold, convert_to_tensor=True)
-    emb2 = model.encode(description_llm, convert_to_tensor=True)
-
-    similarity = util.cos_sim(emb1, emb2).item()
+    score_llm = evaluate_profile_with_llm(
+        reference=description_gold,
+        to_evaluate=description_llm
+    )
+    similarity = score_llm.score
 
     return {
         "gold": description_gold,
@@ -246,8 +348,8 @@ def process_all_sessions(example, speaker_name, speaker_id, sessions, rouge_scor
         )
 
         # Summarize session
-        summary = summarize_session(session, observations, res["observations_session_llm"], model)
-        sessions_observations[session] = {"gold": summary["gold"], "llm": summary["llm"]}
+        summary = summarize_session(observations, res["observations_session_llm"], model)
+        sessions_observations[session] = {"gold": summary["gold"], "llm": summary["llm"], "observations": observations, "features": res["observations_session_llm"]}
 
         # Aggregate session-level stats
         data = mean_rouge
@@ -256,6 +358,7 @@ def process_all_sessions(example, speaker_name, speaker_id, sessions, rouge_scor
         data["ratio"] = res["n_observations_llm"] / len(observations)
         data["missed_observations"] = res["missed_observations"] / len(observations)
         data["session_similarity"] = summary["similarity"]
+        data["mean_memory_update_time"] = res["mean_update_time"]
 
         scores_df = pd.concat([scores_df, data.to_frame().T], ignore_index=True)
 
@@ -269,14 +372,14 @@ if __name__ == "__main__":
     with open(path, "r") as f:
         locomo_data = json.load(f)
 
-    os.makedirs("evaluations/results", exist_ok=True)
+    os.makedirs("results/locomo/base", exist_ok=True)
 
-    for id in range(0, 1):
+    for id in range(len(locomo_data)):
         rouge_score = Rouge()
         model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 
         example = locomo_data[id]
-        sessions = [k for k in example["conversation"].keys() if re.match(r"session_\d+$", k)]
+        sessions = [k for k in example["conversation"].keys() if re.match(r"session_(\d+)$", k) and 1 <= int(re.match(r"session_(\d+)$", k).group(1)) <= 5]
 
         speaker_a = example["conversation"]["speaker_a"]
         speaker_b = example["conversation"]["speaker_b"]
@@ -291,14 +394,14 @@ if __name__ == "__main__":
         scores_df_a, sessions_observations_a = process_all_sessions(
             example, speaker_a, speaker_a_id, sessions, rouge_score, model, conn
         )
-        scores_df_a.to_csv(f"evaluations/results/scores_{id}_a.csv", index=False)
-        with open(f"evaluations/results/sessions_observations_{id}_a.json", "w") as f:
+        scores_df_a.to_csv(f"results/locomo/base/scores_{id}_a.csv", index=False)
+        with open(f"results/locomo/base/sessions_observations_{id}_a.json", "w") as f:
             json.dump(sessions_observations_a, f, ensure_ascii=False, indent=4)
 
         
         scores_df_b, sessions_observations_b = process_all_sessions(
             example, speaker_b, speaker_b_id, sessions, rouge_score, model, conn
         )
-        scores_df_b.to_csv(f"evaluations/results/scores_{id}_b.csv", index=False)
-        with open(f"evaluations/results/sessions_observations_{id}_b.json", "w") as f:
+        scores_df_b.to_csv(f"results/locomo/base/scores_{id}_b.csv", index=False)
+        with open(f"results/locomo/base/sessions_observations_{id}_b.json", "w") as f:
             json.dump(sessions_observations_b, f, ensure_ascii=False, indent=4)

@@ -46,16 +46,17 @@ def memory_retriever(user_id, conn):
     
     # Retrieve the user's features from its table in the database
     cursor = conn.cursor()
-    cursor.execute(f"SELECT type, name, value FROM {user_id}")
+    cursor.execute(f"SELECT type, name, description, value FROM {user_id}")
     rows = cursor.fetchall()
 
     # Format the retrieved data into a list of dictionaries
     memory = []
     for row in rows:
-        type, name, value = row
+        type, name, description, value = row
         memory.append({
             "type": type,
             "name": name,
+            "description": description,
             "value": value
         })
     
@@ -91,11 +92,17 @@ def update_memory(new_memory_object, current_user, conn, database=None):
     existing_primary_features = [feature[0] for feature in existing_primary_features]
     # check if all the primary features are already in the database
     # If not, insert them
-    for feature in ["nom", "age", "genre", "preference_dialogue"]:
+    primary_features = {
+        "nom": "Les prénoms et noms de l'utilisateur.",
+        "age": "L'âge de l'utilisateur.",
+        "genre": "Le genre de l'utilisateur (masculin, féminin, non-binaire, etc.).",
+        "preference_dialogue": "Les préférences de dialogue de l'utilisateur (formel, informel, humoristique, etc.)."
+    }
+    for feature, description in primary_features.items():
         if feature not in existing_primary_features:
             cursor.execute(
-                f"INSERT INTO {current_user} (type, name, value) VALUES (?, ?, ?)",
-                ("primary", feature, '')
+                f"INSERT INTO {current_user} (type, name, description, value, embeddings) VALUES (?, ?, ?, ?, ?)",
+                ("primary", feature, description, '', None)
             )
             conn.commit()
 
@@ -121,16 +128,26 @@ def update_memory(new_memory_object, current_user, conn, database=None):
             if item.name not in [feature[0] for feature in existing_features]:  # Feature does not exist
                 # Insert new feature into the user's memory
                 cursor.execute(
-                    f"INSERT INTO {current_user} (type, name, value) VALUES (?, ?, ?)",
-                    (item.type, item.name, (";").join(item.value))
+                    f"INSERT INTO {current_user} (type, name, description, value, embeddings) VALUES (?, ?, ?, ?, ?)",
+                    (
+                        item.type, 
+                        item.name, 
+                        item.description, 
+                        (";").join(item.value), 
+                        json.dumps(item.embeddings) if item.embeddings else None
+                    )
                 )
-            conn.commit()
-        else:  # Feature exists, update it
-            cursor.execute(
-                f"UPDATE {current_user} SET value = ? WHERE name = ?",
-                ((";" ).join(item.value), item.name)
-            )
-            conn.commit()
+                conn.commit()
+            else:  # Feature exists, update it
+                cursor.execute(
+                    f"UPDATE {current_user} SET value = ?, embeddings = ? WHERE name = ?",
+                    (
+                        (";").join(item.value) if isinstance(item.value, (list, tuple)) else str(item.value),
+                        json.dumps(item.embeddings) if item.embeddings else None,
+                        item.name
+                    )
+                )
+                conn.commit()
     if new_conn:
         conn.close()
     return memory_retriever(current_user, conn)
@@ -202,7 +219,6 @@ def user_retriever(img, conn, model_config, database=None):
         similarities = cos(embedding, known_user_embeddings)
 
         best_score, best_idx = torch.max(similarities, dim=0)
-        print(f"Best score: {best_score.item()}")
         if best_score.item() > 0.5: #TODO: remake this a config variable
             # If a user is found, return the user ID and their memory
             user_id = list(embeddings_dict.keys())[best_idx.item()]
@@ -225,14 +241,20 @@ def user_retriever(img, conn, model_config, database=None):
     )
 
     cursor.execute(
-        f"CREATE TABLE IF NOT EXISTS {new_user_id} (type TEXT, name TEXT, value TEXT)"
+        f"CREATE TABLE IF NOT EXISTS {new_user_id} (type TEXT, name TEXT, description TEXT, value TEXT, embeddings BLOB)"
     )
 
     #create empty slots for the primary features
-    for feature in ["nom", "age", "genre", "preference_dialogue"]:
+    primary_features = {
+        "nom": "Les prénoms et noms de l'utilisateur.",
+        "age": "L'âge de l'utilisateur.",
+        "genre": "Le genre de l'utilisateur (masculin, féminin, non-binaire, etc.).",
+        "preference_dialogue": "Les préférences de dialogue de l'utilisateur (formel, informel, humoristique, etc.)."
+    }
+    for feature, description in primary_features.items():
         cursor.execute(
-            f"INSERT INTO {new_user_id} (type, name, value) VALUES (?, ?, ?)",
-            ("primary", feature, ''),
+            f"INSERT INTO {new_user_id} (type, name, description, value, embeddings) VALUES (?, ?, ?, ?, ?)",
+            ("primary", feature, description, '', None),
         )
 
     user_memory = memory_retriever(new_user_id, conn)

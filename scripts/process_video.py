@@ -69,7 +69,7 @@ if __name__ == "__main__":
     cap = cv2.VideoCapture(input_path)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_face = executor.submit(detect_speaking_face, cap, model, landmark_detector, save_frames=True)
+        future_face = executor.submit(detect_speaking_face, cap, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, f'{name_video}.mp4', stt_model)
 
         speaking_face_row, grid, probs = future_face.result()

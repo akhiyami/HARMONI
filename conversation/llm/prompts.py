@@ -34,6 +34,7 @@ reply_prompt = {
         "Important :\n"
         "- Tu peux converser avec plusieurs utilisateurs en même temps, mais tu dois toujours te souvenir de qui est qui.\n"
         "- Privilégie des réponses courtes et simples, comme dans une conversation normale.\n"
+        "- Si tu ne le connais pas, tu dois demander le nom de l'utilisateur.\n"
     ),
 }
 
@@ -58,10 +59,13 @@ feature_identification_prompt = {
         "- Retourne uniquement : les noms des features que tu souhaites ajouter, et de celles que tu souhaite modifier sans changer leur nom.\n"
         "- Ne change sous aucun prétexte le nom d'une feature que tu souhaites modifier.\n"
         "- Retourne uniquement l'objet JSON, sans commentaire autour."
+
+        "Par exemple, si l'utilisateur dit 'Je m'appelle Jean et j'adore le jazz', tu devrais retourner :\n"
+        '{ "Add": ["nom", "Interets"], "Modify": [] }\n'
     ),
 }
 
-add_feature_prompt = {
+add_feature_prompt = {  
     "role": "system",
     "content":(
         "Tu es un assistant chargé d'analyser un échange entre un robot et un utilisateur pour en extraire des informations utiles à mémoriser.\n"
@@ -69,16 +73,16 @@ add_feature_prompt = {
         "- `features` : opinions, faits marquants, préférences, souvenirs, etc.\n\n"
 
         "Tu reçois :\n"
-        "- Le nom d'une feature à ajouter à la mémoire de l'utilisateur. \n"
+        "- Le nom et la description d'une feature à ajouter à la mémoire de l'utilisateur. \n"
         "- Tes dernières interactions avec l'utilisateur,\n"
         "- La dernière question de l'utilisateur,\n"
 
-        "Ta mission est d'extraire l'information de cette question pour créer une feature claire, correspondant au nom demandé.\n\n"
+        "Ta mission est d'extraire l'information de cette question pour créer une feature claire, correspondant au nom et à la description demandés.\n\n"
 
         "Instructions :\n"
         "- Analyse la question de l'utilisateur pour en extraire l'information pertinente.\n"
-        "- Formule la Feature correspondante au nom demandé, de la façon la plus claire possible.\n"
-        "- La description de la caractéristique doit être faite du point de vue d'un observateur extérieur, comme un compte-rendu médical.\n"
+        "- Formule la Feature correspondante au nom et à la description demandés, de la façon la plus claire possible.\n"
+        "- La valeur de la caractéristique doit être écrite du point de vue d'un observateur extérieur sous forme d'une courte phrase, comme un compte-rendu médical.\n"
         "- N'invente pas d'information, appuie toi uniquement sur les mots de l'utilisateur.\n"
         "- Retourne uniquement l'objet JSON, sans commentaire autour."
     )
@@ -101,6 +105,7 @@ modify_feature_prompt = {
         "Instructions :\n"
         "- Analyse s'il y a de nouvelles informations à ajouter, où d'anciennes informations à corriger.\n"
         "- Ne modifie pas les informations existantes sauf si l'utilisateur les corrige explicitement.\n"
+        "- La valeur de la caractéristique doit être écrite du point de vue d'un observateur extérieur sous forme d'une courte phrase, comme un compte-rendu médical.\n"
         "- Les utilisateurs peuvent se tromper, ou avoir des doutes, donc ne cherche pas à changer les informations sans certitude.\n"
         "- Par rapport aux rendez-vous de l'utilisateur: tes informations prévalent sur celles de l'utilisateur.\n"
         "- Ne change sous aucun prétexte le nom de la feature à modifier.\n"

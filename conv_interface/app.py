@@ -22,6 +22,8 @@ import sqlite3
 from collections import deque
 from io import BytesIO
 import time
+import json
+import yaml
 
 from PIL import Image
 
@@ -34,7 +36,7 @@ from config.settings import LEN_HISTORY
 
 from conversation.llm.openai_inferences import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
-from conversation.memory.utils import create_table
+from conversation.memory.utils import create_table, empty_database
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
 
@@ -56,6 +58,8 @@ current_session = deque(maxlen=LEN_HISTORY)
 # facial encoding model
 model_config = get_face_embedding_model("INSIGHTFACE")  # or "ULIP-p16" for Siglip
 
+config_path = "config/config.yaml"
+
 #--------------------------------------- Routes ---------------------------------------#
 
 @app.get("/", response_class=HTMLResponse)
@@ -65,6 +69,12 @@ async def get_home():
     """
     with open("conv_interface/static/index.html", "r") as f:
         return f.read()
+    
+@app.get("/config")
+def get_config():
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    return config 
 
 
 @app.post("/ask")
@@ -146,3 +156,90 @@ async def set_user(image: UploadFile = File(...)):
     else:
         memory = memory_retriever(current_user, conn)
         return {"user_id": current_user, "profile": memory}
+    
+@app.post("/reset_session")
+async def reset_session():
+    global current_session
+    current_session = []
+    return {"status": "success"}
+
+@app.post("/reset_database")
+async def reset_database():
+    conn = sqlite3.connect(database)
+
+    empty_database(conn)
+
+    conn = sqlite3.connect(database) 
+    create_table(conn) 
+
+    conn.close()
+    return {"status": "success"}
+
+
+@app.get("/get_context")
+async def get_context():
+    """
+    Get the current context for the user.
+    """
+    global current_context
+    return {"context": current_context}
+
+@app.post("/set_context")
+async def set_context(context: str = Form(...)):
+    """
+    Update the context for the user.
+    """
+    global current_context
+    current_context = context
+    return {"status": "success"}
+
+
+@app.post("/get_profile")
+async def get_profile(
+    user_id: str = Form(...),
+    ):
+    """
+    Get the profile information for a specific user.
+    """
+    global conn
+    profile = memory_retriever(user_id, conn)
+    return {"profile": profile}
+
+
+
+
+@app.post("/edit_user")
+async def edit_user(
+    user_id: str = Form(...),
+    profile_data: str = Form(...),
+    ):
+    """
+    Edit user information in the database.
+    """
+    # Parse the JSON string sent from the frontend
+    try:
+        profile_dict = json.loads(profile_data)
+    except json.JSONDecodeError as e:
+        return {"status": "error", "message": f"Invalid JSON data: {str(e)}"}
+
+    # update the user profile in the database here
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+    # reset the user table
+    cursor.execute(f"DELETE FROM {user_id}")
+    conn.commit()
+
+    # Insert the new profile data
+    for feature in profile_dict:
+        values_list = feature.get("value", [])
+        value = ';'.join(values_list) if isinstance(values_list, list) else values_list
+        cursor.execute(
+            f"INSERT INTO {user_id} (type, name, description, value) VALUES (?, ?, ?, ?)",
+            (feature.get("type"), feature.get("name"), feature.get("description"), value),
+        )
+
+    conn.commit()
+    conn.close()
+    return {"status": "success"}
+    
+    

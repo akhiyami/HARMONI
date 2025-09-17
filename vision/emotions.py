@@ -4,16 +4,6 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
 
-def generate_description(image, model, processor):
-    prompt = "<image> "
-    model_inputs = processor(text=prompt, images=image, return_tensors="pt").to(torch.bfloat16).to(model.device)
-    input_len = model_inputs["input_ids"].shape[-1]
-    
-    with torch.inference_mode():
-        generation = model.generate(**model_inputs, max_new_tokens=100, do_sample=False)
-        generation = generation[0][input_len:]
-        decoded = processor.decode(generation, skip_special_tokens=True)
-        return decoded
 
 def prob_emotions(image, model, processor):
     if isinstance(image, np.ndarray):

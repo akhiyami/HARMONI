@@ -13,6 +13,15 @@ body {
     margin-top: 0.5rem ;
 }
 
+#contextWindow {
+    min-width: 40%;
+    min-height: 30%;
+}
+
+#verifWindow {
+    min-width: 30%;
+    min-height: 20%;
+}
 
 
 .msg { margin: 0.5rem 0; }
@@ -41,6 +50,7 @@ body {
 #user_info {
     display: flex;
     width: 100%;
+    justify-content: space-between;
 }
 
 #user {
@@ -72,17 +82,28 @@ body {
     width: 100%;
     box-sizing: border-box;
     text-align: center;
+    gap: 0.5em;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
 }
 
-.user-label {
-    padding: 0.5em 1em;
-    background: #aaa;
-    color: #fff;
-    cursor: pointer;
-    border-radius: 4px;
-    display: block;
-    margin: 0 5%;
-    box-sizing: border-box;
+.user_button {
+    width: 90%;
+    background-color: #2196F3;
+}
+
+.user_button:hover {
+    background-color: #1976D2;
+}
+
+.edit_button {
+    width: 90%;
+    background-color: #2196F3; 
+}
+
+.edit_button:not(:disabled):hover {
+    background-color: #1976D2; /* Darker blue on hover */
 }
 
 #imageInput {
@@ -102,6 +123,7 @@ body {
     justify-content: center;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
 
 #question {
@@ -115,11 +137,350 @@ body {
 }
 
 .submit {
-    padding: 0.7em 2em; 
+    padding: 0.7rem 1.3rem;     
     background: #4CAF50; 
     color: #fff; 
     border: none; 
-    border-radius: 4px; 
-    font-size: 1.1rem; 
+    border-radius: 8px; 
+    font-size: 1.3rem; 
     cursor: pointer; 
+    transition: background-color 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.buttons_area {
+    text-align: center;
+    width: 35%;
+    vertical-align: top;
+    box-sizing: border-box;
+    display: flex;
+    gap: 1em;
+    flex-direction: column;
+    align-items: center;
+    align-self: center;
+}
+
+button {
+    display: inline-block;
+    background-color: #ccc;         
+    color: white;                      /* White text */
+    padding: 0.5rem 1rem;              /* Spacing inside the button */
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Disabled state */
+button:disabled {
+    background-color: #888;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.grey_button {
+    background-color: #aaa; /* Grey background */
+}
+.grey_button:hover {
+    background-color: #888; /* Darker grey on hover */
+}
+
+.green_button {
+    background-color: #4CAF50; /* Green background */
+}
+.green_button:hover {
+    background-color: #2e7d32; /* Darker green on hover */
+}
+
+.blue_button {
+    background-color: #2196F3; /* Blue background */
+}
+.blue_button:hover {
+    background-color: #1976D2; /* Darker blue on hover */
+}
+
+.red_button { 
+    background-color: #f44336; /* Red background */
+}
+.red_button:hover {
+    background-color: #d32f2f; /* Darker red on hover */
+}
+
+
+
+/* popups */
+.background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5); /* semi-transparent background */
+    z-index: 9999; /* on top */
+    display: none; /* this is the fix! */
+}
+
+.window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 40%;
+    min-height: 30%;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 10000; /* on top */
+    text-align: center;
+    align-content: center;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+}
+.window_buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+#verifWindow {
+    min-width: 30%;
+    min-height: 20%;
+}
+
+#featureWindow {
+    min-width: 60%;
+    max-height: 70vh; 
+    display: none;
+}
+
+
+/* CSS for the table container */
+
+.container {
+    width: 75%;
+    margin: auto;
+    margin-top: 1em;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden; /* clip table to rounded corners */
+}
+
+.container table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.container thead {
+    background-color: #4CAF50;
+    box-shadow: inset -5px -7px 12px #45a448;
+    color: white;
+}
+
+.container thead th {
+    padding: 12px;
+}
+
+.container tbody {
+    display: block;             /* allow scrolling */
+    max-height: 50vh;           /* limit height */
+    overflow-y: auto;          /* enable vertical scroll */
+    font-size: smaller;
+    color: #333;
+    
+    /* Firefox scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #4CAF50 #fcfcfc;
+}
+
+.container thead,
+.container tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.container tbody tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+.container tbody tr:nth-child(even) {
+    background-color: #f8f8f8;
+}
+
+.container tbody tr:hover {
+    background-color: #c4ebc6; /* light green on hover */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.container tbody tr.expanded {
+    background-color: #9acf9a; /* slightly darker green for expanded row */
+}
+
+.container tbody tr.expanded-detail {
+    background-color: #8cca8c; /* even lighter green for detail row */
+    cursor: default; /* prevent pointer cursor on detail row */
+}
+
+.container tbody tr.expanded-detail textarea {
+    border: none;
+    background-color: rgba(255, 255, 255, 0.553);
+    font-family: inherit;
+    padding: 5px;
+    font-size: smaller;
+    width: 100%;
+    box-sizing: border-box; /* ensure padding does not affect width */
+    resize: none; /* prevent resizing */
+
+
+}
+.container tbody tr.expanded-detail textarea:hover {
+    background-color: rgba(255, 255, 255, 0.8); /* slightly darker on hover */
+}
+
+.container tbody tr.expanded-detail textarea:focus {
+    outline: none; /* remove default focus outline */
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); /* add a subtle shadow on focus */
+    background-color: #fff;
+}
+.container tbody tr.expanded-detail textarea:active {
+    background-color: #fff
+}
+
+.container tbody td {
+    padding: 12px;
+}
+
+
+
+.detail-wrapper {
+    height: 0;
+    overflow: hidden;
+    padding: 0px;
+    transition: height 0.3s ease, padding 0.3s ease;
+    margin: 0;
+}
+
+.detail-wrapper .button-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin: 0 0 10px 0;
+}
+
+.detail-wrapper .button-row button {
+    color: white;
+    border: none;
+    padding: 5px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    width: fit-content;
+    margin: 0;
+}
+
+
+/* ===== Scrollbar ===== */
+.container tbody::-webkit-scrollbar {
+    width: 8px;
+}
+
+.container tbody::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.container tbody::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 10px;
+}
+
+.container tbody::-webkit-scrollbar-thumb:hover {
+    background: #45a049;
+}
+
+
+/* FORM */
+.pill-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;   
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: text;
+    background-color: #fff;
+    align-items: center;    /* Center vertically */
+    overflow-y: hidden;
+    overflow-x: auto;
+    height: 36px;  /* Set a base height equal to pill height */
+}
+
+.pill {
+    background-color: #007BFF;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap; 
+}
+
+.pill button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1em;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.pill-container input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 80px;
+    padding:0;
+    margin:0;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width : 90%;
+    margin : auto; 
+}
+
+form label {
+    display: block;
+}
+
+form textarea {
+    padding: 10px 5px;;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: text;
+    background-color: #fff;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    resize: none;
+}
+
+form textarea:focus {
+    outline: none;
 }

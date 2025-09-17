@@ -18,6 +18,7 @@ import tempfile
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 import matplotlib.pyplot as plt
+import yaml
 
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
@@ -61,7 +62,6 @@ insightface_model = models.INSIGHTFACE_MODEL
 # Load user retriever model and processor
 user_retriever_config = get_face_embedding_model("INSIGHTFACE")
 
-
 # Database connection for user retrieval
 database = 'users.db'
 conn = sqlite3.connect(database)
@@ -73,6 +73,9 @@ current_user_image = None
 html_blocks = []
 current_context = ""
 
+config_path = "config/config.yaml"
+
+
 #--------------------------------------- Routes ---------------------------------------#
 
 @app.get("/", response_class=HTMLResponse)
@@ -82,6 +85,13 @@ async def get_home():
     """
     with open("static/index.html", "r") as f:
         return f.read()
+    
+
+@app.get("/config")
+def get_config():
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    return config 
 
 
 @app.post("/set_video")
@@ -98,7 +108,7 @@ async def set_video(video: UploadFile = File(...)):
 
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_face = executor.submit(detect_speaking_face, tmp_path, model, insightface_model, save_frames=True)
+        future_face = executor.submit(detect_speaking_face, tmp_path, save_frames=True)
         future_transcript = executor.submit(extract_and_transcribe_audio, tmp_path, stt_model)
 
         speaking_face_row, grid, probs = future_face.result()
@@ -285,8 +295,8 @@ async def edit_user(
         values_list = feature.get("value", [])
         value = ';'.join(values_list) if isinstance(values_list, list) else values_list
         cursor.execute(
-            f"INSERT INTO {user_id} (type, name, value) VALUES (?, ?, ?)",
-            (feature.get("type"), feature.get("name"), value),
+            f"INSERT INTO {user_id} (type, name, description, value) VALUES (?, ?, ?, ?)",
+            (feature.get("type"), feature.get("name"), feature.get("description"), value),
         )
 
     conn.commit()

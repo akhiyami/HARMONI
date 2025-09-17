@@ -15,6 +15,7 @@ import sys
 import os
 import yaml
 import sqlite3
+import concurrent.futures
 
 import numpy as np
 from openai import OpenAI
@@ -25,7 +26,7 @@ sys.path.append(root_folder_path)
 from config.settings import API_KEY, LEN_HISTORY
 from memory.models import LongTermMemory, FeaturesNames
 from llm.prompts import qa_instructions, add_feature_prompt, modify_feature_prompt, reply_prompt, feature_identification_prompt
-from llm.retriever import features_retriever
+from llm.retriever import features_retriever, attach_embeddings
 
 # Initialize LLM client 
 client = OpenAI(api_key=API_KEY)
@@ -59,7 +60,7 @@ else:
 # ANSWER GENERATION FUNCTION #
 ##############################
 
-def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None, reply_prompt=reply_prompt, verbose=True):
+def generate_answer(question, history, context, conn=None, current_user=None, visual_profile=None, reply_prompt=reply_prompt, retriever=True, verbose=True):
     """
     Ask the LLM a question and retrieve the answer along with updated memory.
     This function prepares the context and session history, retrieves relevant features from the user's memory,
@@ -80,40 +81,59 @@ def generate_answer(question, history, context, conn=None, current_user=None, vi
     stm = deque(history, maxlen=LEN_HISTORY)
 
     # retrieved only pertinent informations from long term memory
-    now = time.time()
-    retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
-    retrival_time = time.time() - now
-    retrieved_features_names = [feature["name"] for feature in retrieved_memory]
-    if verbose:
-        print(f"Retrieved features: {retrieved_features_names}")
+    if retriever:
+        now = time.time()
+        retrieved_memory = features_retriever(question, conn=conn, user_id=current_user)
+        retrival_time = time.time() - now
+        retrieved_features_names = [feature["name"] for feature in retrieved_memory]
+        if verbose:
+            print(f"Retrieved features: {retrieved_features_names}")
+        memory = retrieved_memory
+    else:
+        memory = []
+        cursor = conn.cursor()
+        retrieved_features_names = []
+
+        cursor.execute(f"SELECT type, name, description, value FROM {current_user}")
+        rows = cursor.fetchall()
+        for type, name, description, value in rows:
+            feature = {
+                "type": type,
+                "name": name,
+                "description": description,
+                "value": value.split(";") if value else []
+            }
+            memory.append(feature)
+            retrieved_features_names.append(name)
 
     # Check and manage if a visual profile is provided
     if visual_profile:
         if "emotion" in visual_profile and visual_profile["emotion"] is not None:
             emotion = visual_profile["emotion"]
-            retrieved_memory.insert(4, {
+            memory.insert(4, {
                 "type": "contextual",
                 "name": "emotion",
+                "description": "Émotion actuelle de l'utilisateur, détectée à partir de son expression faciale.",
                 "value": [emotion]
             })
 
-        if retrieved_memory[1]["value"] is not None: #age
+        if memory[1]["value"] is not None: #age
             if 'age' in visual_profile and visual_profile["age"] is not None:
                 age = visual_profile["age"]
-                retrieved_memory[1]["value"] = [age]
+                memory[1]["value"] = [age]
         
         #check if the age is known in the retrieved memory
-        if retrieved_memory[2]["value"] is not None: #gender
+        if memory[2]["value"] is not None: #gender
             if 'gender' in visual_profile and visual_profile["gender"] is not None:
                 gender = visual_profile["gender"]
-                retrieved_memory[2]["value"] = [gender]
+                memory[2]["value"] = [gender]
 
     # Prepare the long term memory context
     ltm = {
         "role": "system", 
         "content": [{ 
             "type": "text",
-            "text": json.dumps(retrieved_memory, indent=2, ensure_ascii=False)  # ensure_ascii=False preserves characters like "é"
+            "text": json.dumps(memory, indent=2, ensure_ascii=False)  # ensure_ascii=False preserves characters like "é"
         }]
     }
 
@@ -185,25 +205,27 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
 
     # Add the primary features
     cursor = conn.cursor()
-    cursor.execute(f"SELECT name, value FROM {current_user} WHERE type = 'primary'")
+    cursor.execute(f"SELECT name, description, value FROM {current_user} WHERE type = 'primary'")
     rows = cursor.fetchall()
     for row in rows:
-        name, value = row
+        name, description,value = row
         feature = {
             "type": "primary",
             "name": name,
+            "description": description,
             "value": value.split(";") if value else []
         }
         ltm["primary_features"].append(feature)
 
     # Add the contextual features
-    cursor.execute(f"SELECT name, value FROM {current_user} WHERE type = 'contextual'")
+    cursor.execute(f"SELECT name, description, value FROM {current_user} WHERE type = 'contextual'")
     rows = cursor.fetchall()
     for row in rows:    
-        name, value = row
+        name, description, value = row
         feature = {
             "type": "contextual",
             "name": name,
+            "description": description,
             "value": value.split(";") if value else []
         }
         ltm["features"].append(feature)
@@ -231,30 +253,46 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         response_format=FeaturesNames
     )
 
-    features_names = completion.choices[0].message.parsed
-    new_features = features_names.Add 
-    new_features = [new_feature.name for new_feature in new_features]
-    modified_features = features_names.Modify
-
-    print("ADD:", new_features)
-    print("MODIFY:", modified_features)
-
+    if not completion or not completion.choices or not hasattr(completion.choices[0].message, "parsed"):
+        if completion:
+            print(f"NOT ABLE TO PARSE THE COMPLETION: {completion}")
+        new_features = []
+        modified_features = []
+    else:
+        features_names = completion.choices[0].message.parsed
+        new_features = getattr(features_names, "Add", [])
+        new_features = [new_feature.name for new_feature in new_features]
+        modified_features = getattr(features_names, "Modify", [])
+    
     #look for the features to modify in db
     to_modify_features = []
     for feature in modified_features:
-        cursor.execute(f"SELECT type, name, value FROM {current_user} WHERE name = ?", (feature,))
+        cursor.execute(f"SELECT type, name, description, value FROM {current_user} WHERE name = ?", (feature,))
         to_modify_features = cursor.fetchall()
 
     updated_ltm = LongTermMemory(primary_features=[], features=[])
 
-    import concurrent.futures
+    primary_features = {
+        "nom": "Les prénoms et noms de l'utilisateur.",
+        "age": "L'âge de l'utilisateur.",
+        "genre": "Le genre de l'utilisateur (masculin, féminin, non-binaire, etc.).",
+        "preference_dialogue": "Les préférences de dialogue de l'utilisateur (formel, informel, humoristique, etc.)."
+    }
 
     def add_feature_task(new_feature):
+        if config.get("memory", {}).get("closed_vocabulary", True):
+            if new_feature in primary_features:
+                description = primary_features[new_feature]
+            else:
+                description = config.get("memory", {}).get("vocabulary", {}).get(new_feature, "")
+
+        else:
+            description = ""
         add_feature = memory_client.chat.completions.parse(
             model=memory_model,
             messages=[
                 add_feature_prompt,
-                {"role": "system", "content": f"Le nom de la feature à ajouter est : {new_feature}."},
+                {"role": "system", "content": f"La feature à ajouter est : {new_feature}({description})."},
                 {"role": "system", "content": f"Dernières interactions : {stm}."},
                 {"role": "user", "content": f"{user_question}"},
             ],
@@ -285,8 +323,11 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         # Collect add_feature results
         for future in concurrent.futures.as_completed(add_futures):
             new_feature_parsed = future.result()
-            if new_feature_parsed.features:
-                updated_ltm.features.append(new_feature_parsed.features[0])
+            if new_feature_parsed.primary_features:
+                updated_ltm.primary_features.append(new_feature_parsed.primary_features[0])
+            elif new_feature_parsed.features:
+                if new_feature_parsed.features[0].value:
+                    updated_ltm.features.append(attach_embeddings(new_feature_parsed.features[0]))
 
         # Collect modify_feature results
         for future in concurrent.futures.as_completed(modify_futures):
@@ -294,7 +335,8 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
             if modified_feature_parsed.primary_features:
                 updated_ltm.primary_features.append(modified_feature_parsed.primary_features[0])
             elif modified_feature_parsed.features:
-                updated_ltm.features.append(modified_feature_parsed.features[0])
+                if modified_feature_parsed.features[0].value:
+                    updated_ltm.features.append(attach_embeddings(modified_feature_parsed.features[0]))
 
     if new_conn:
         conn.close()

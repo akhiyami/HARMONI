@@ -5,10 +5,86 @@
     <meta charset="UTF-8">
     <title>Chatbot</title>
     <link rel="stylesheet" href="static/style.css">
+    <script src="static/script.js" defer></script>
 </head>
 
 <body>
     <h1>Assistant Virtuel</h1>
+
+    <div id="verifBackground" class="background">
+        <div id="verifWindow" class="window">
+            <h2 style="margin:0; padding:0;">Are you sure you want to reset the database?</h2>
+            <p>This will delete all data in the database.</p>
+            <p>Do you want to continue?</p>
+            <div class="window_buttons">
+                <button id="confirmResetBtn" class="green_button">Yes, reset</button>
+                <button id="cancelResetBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="contextBackground" class="background">
+        <div id="contextWindow" class="window">
+            <h2 style="margin:0; padding:0;">Modify Context</h2>
+            <p>Enter the new context for the user:</p>
+            <textarea id="contextInput" rows="8" cols="70"></textarea>
+            <div class="window_buttons">
+                <button id="saveContextBtn" class="green_button">Save</button>
+                <button id="cancelContextBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="databaseBackground" class="background">
+
+        <div id="userWindow" class="window">
+            <h2 style="margin:0; padding:0;">Edit User Profile</h2>
+
+            <div id="edit_user_box" class="edit_user_box">
+                <div class = container>
+                    <table id="edit_profile">
+                        <thead></thead>
+                        <tbody id="features-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="window_buttons">
+                <button id="saveUserBtn" class="green_button">Save User</button>
+                <button id="addFeatureBtn" class="blue_button">Add Feature</button>
+                <button id="cancelUserBtn" class="grey_button">Cancel</button>
+            </div>
+            
+        </div>
+
+        <div id='featureWindow' class="window">
+            <h2>Add New Feature</h2>
+            <form id="add-feature-form">
+                <label for="feature-name">Feature Name:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="name-container">
+                    <!-- will be replaced dynamically -->
+                </div>
+
+                <label for="feature-description">Description:</label>
+                <div class="pill-container">
+                    <input type="text" id="feature-description" name="feature-description"
+                        placeholder="Type description here..." maxlength="200">
+                </div>
+
+                <label for="feature-values">Values:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="values-container">
+                    <input type="text" id="feature-values-input" placeholder="Type value and press Enter">
+                </div>
+                <input type="hidden" id="feature-values" name="feature-values" required>
+
+                <div class="window_buttons">
+                    <button type="submit" id="save-feature-btn" class="green_button">Save Feature</button>
+                    <button type="button" id="cancel-feature-btn" class="grey_button">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+    </div>
 
     <!-- Section utilisateur : image et profil -->
     <div id="user_info">
@@ -21,17 +97,34 @@
             <img id="preview" src="" alt="Image de l'utilisateur actif">
 
             <div class="user-label-container">
-                <label for="imageInput" class="user-label">
+                <button type="button" class="user_button" onclick="document.getElementById('imageInput').click();">
                     Utilisateur actif
-                    <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
-                </label>
+                </button>
+                <input type="file" id="imageInput" accept="image/*" style="display:none;" onchange="handleImageSelect(event)">
+
+                <button type="button" id="editDatabaseBtn" class="edit_button" onclick="editDatabase()" disabled>Edit User</button>
+                
             </div>
+
         </div>
         
         <!-- User profile (live updated) -->
         <div id="profile">
             <h3 style="margin:0; padding:0.5rem">A propos :</h3>
             <span id="live_profile"></span>
+        </div>
+
+        <div class="buttons_area">
+            <div class="change_context">
+                <button id="context_button" class="blue_button" onclick="changeContext()">Modify Context</button>
+            </div>
+            <div id="reset_session">
+                <button id="resetSessionBtn" class="green_button" onclick="resetSession()">Reset Session</button>
+            </div>
+            <div class="reset_database">
+                <button id="resetDatabaseBtn" class="red_button" onclick="verifCleanDatabase()">Reset Database</button>
+            </div>
+            
         </div>
 
     </div>
@@ -46,149 +139,7 @@
             Envoyer
         </button>
     </form>
-
-    <!-- Script for dynamic behavior -->
-    <script>
-        //dynamic style
-        const user_field= document.getElementById("user");
-        const profile = document.getElementById("profile");
-        profile.style.height = `${user_field.offsetHeight}px`;
-
-        //constants
-        const chatbox = document.getElementById("chatbox");
-        const form = document.getElementById("chat-form");
-        const questionInput = document.getElementById("question");
-        const live_profile = document.getElementById("live_profile");
-
-        //global variables
-        let userId = ""; // Default user ID
-
-        // Empty the chat form input
-        questionInput.value = ""
-
-        // Event listener for form submission
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const question = questionInput.value.trim();
-            const user = userId; 
-
-            questionInput.value = "";
-
-            if (!user) {
-                addMessage("Erreur", "Veuillez sélectionner un utilisateur actif.", "error");
-                questionInput.value = ""
-                return;
-            }
-
-            if (!question) return;
-
-            addMessage(user, question, "user");
-
-            const response = await fetch("/ask", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({question, user})
-            });
-
-            const data = await response.json();
-            if (data.answer) {
-                addMessage("Assistant", data.answer, "bot");
-            } else {
-                addMessage("Erreur", data.error || "Erreur inconnue", "bot");
-            }
-
-            if (!data.profile) {
-                live_profile.innerHTML = "";
-            } else {
-                // Separate primary and contextual items
-                const primary = data.profile.filter(item => item.type === "primary");
-                const contextual = data.profile.filter(item => item.type === "contextual");
-
-                let html = "";
-                if (primary.length > 0) {
-                    html += primary.map(
-                        item => `<b>${item.name}:</b> </br>${item.value}`
-                    ).join('<br>');
-                }
-                if (contextual.length > 0) {
-                    if (primary.length > 0) html += "<br>----------<br>";
-                    html += contextual.map(
-                        item => `<b>${item.name}:</b> </br>${item.value}`
-                    ).join('<br>');
-                }
-                live_profile.innerHTML = html;
-            }
-            
-        });
-
-        // Function to add a message to the chatbox
-        function addMessage(sender, text, role) {
-            const div = document.createElement("div");
-            div.className = `msg ${role}`;
-            div.textContent = `${sender}: ${text}`;
-            chatbox.appendChild(div);
-            chatbox.scrollTop = chatbox.scrollHeight;
-        }
-
-        // Function to handle image selection and update user profile
-        function handleImageSelect(event) {
-            const file = event.target.files[0];
-            const preview = document.getElementById('preview');
-            const userPlaceholder = document.getElementById('user_placeholder');
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    preview.style.display = 'inline';
-                    userPlaceholder.style.display = 'none';
-
-                    const formData = new FormData();
-                    formData.append('image', file);
-
-                    fetch('/set_user', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        addMessage("Change user", data.user_id, "system");
-                        userId = data.user_id; 
-
-                        if (!data.profile) {
-                            live_profile.innerHTML = "";
-                        } else {
-                            const primary = data.profile.filter(item => item.type === "primary");
-                            const contextual = data.profile.filter(item => item.type === "contextual");
-
-                            let html = "";
-                            if (primary.length > 0) {
-                                html += primary.map(
-                                    item => `<b>${item.name}:</b> </br>${item.value}`
-                                ).join('<br>');
-                            }
-                            if (contextual.length > 0) {
-                                if (primary.length > 0) html += "<br>----------<br>";
-                                html += contextual.map(
-                                    item => `<b>${item.name}:</b></br>${item.value}`
-                                ).join('<br>');
-                            }
-                            live_profile.innerHTML = html;
-                        }
-                        
-                    })
-                    .catch(error => {
-                        console.error('Error setting user:', error);
-                        addMessage("Erreur", "Erreur lors de la mise à jour de l'utilisateur actif.", "error");
-                    });
-                };
-                reader.readAsDataURL(file);
-            } else {
-                preview.src = '';
-                preview.style.display = 'none';
-            }
-        }
-    </script>
-
+    
 </body>
 
 </html>

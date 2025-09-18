@@ -44,13 +44,34 @@ cd Context-aware_Conversation
 pip install -r requirements.txt
 ```
 ## Configuration
+
+Before running the code, a few adjustments are required to ensure everything works smoothly.
+You’ll need to:
+- Set up the necessary [environment variables](#environment-variables).
+- Choose the appropriate settings to tailor the pipeline to your objectives.
+
+This configuration step allows you to customize the behavior of the system and make the most out of the pipeline for your specific use case.
+
+### Models
+
+Most of the models used in the pipeline are defined in the [config directory](./config/)
+
+
+>[!IMPORTANT]
+>The LLMs used for generating answers and updating memory are defined in a config file.
+>This implementation supports only the **OpenAI Client**, with two options:
+>- **OpenAI model** → requires a valid *OpenAI API key*.
+>- **Ollama model** → ensure the model has been pulled to your local device.
+
 ### Environment variables:
-You will need an *OpenAI API key* and a *HuggingFace token* :
+You will need a *HuggingFace token* and optionnaly an *OpenAI API key* :
 ```bash
 touch .env
-echo "API_KEY=your_api_key_here" >> .env
 echo "SECRET_KEY=your_secret_key_here" >> .env
+echo "API_KEY=your_api_key_here" >> .env
 ```
+
+
 ## Execution
 To run the conversation app :
 ```bash

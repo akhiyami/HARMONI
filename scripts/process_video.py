@@ -42,7 +42,6 @@ if SAVE_HTML:
 
 # Load models from vision module
 model = models.YOLO_FACE_MODEL
-landmark_detector = models.LANDMARK_DETECTOR
 stt_model = models.WHISPER_MODEL
 emotion_model = models.EMOTION_MODEL
 emotion_processor = models.EMOTION_PROCESSOR

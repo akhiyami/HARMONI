@@ -29,6 +29,8 @@ conn = sqlite3.connect("locomo.db")
 
 dotenv.load_dotenv()
 API_KEY = os.getenv("OPENAI_API_KEY")
+if not API_KEY:
+    raise ValueError("Please set the OPENAI_API_KEY environment variable.")
 
 config_path = os.path.join(root_folder_path, 'config', 'config.yaml')
 config = yaml.safe_load(open(config_path))
@@ -355,7 +357,7 @@ if __name__ == "__main__":
 
     os.makedirs("results/locomo/ltm_stm", exist_ok=True)
 
-    for id in range(len(locomo_data)):
+    for id in range(2, len(locomo_data)):
         rouge_score = Rouge()
         model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 

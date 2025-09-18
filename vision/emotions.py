@@ -4,7 +4,6 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
 
-
 def prob_emotions(image, model, processor):
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image).convert("RGB")

@@ -1,24 +1,41 @@
 """
 # app.py
+This file contains the main FastAPI application for handling user interactions, and video processing, 
+including detecting speaking user, retrieving user profiles, answering questions, and updating user memory.
+It integrates with the memory module to store and retrieve user-specific data.
+It also handles user image for face recognition and user identification.
+==========
+Run the application in the root dir using:
+    uvicorn video_interface.app:app --reload
 """
 
 #--------------------------------------- Imports ---------------------------------------#
 
-import threading
-import warnings
-import sqlite3
-from collections import deque
-from io import BytesIO
-import time
-import numpy as np
 import os
-from PIL import Image
-import cv2
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
+
+import threading
+import time
 import tempfile
 import shutil
-from concurrent.futures import ThreadPoolExecutor
+import sqlite3
+import json
+import base64
+import io
+
+from collections import deque
+
+import numpy as np
+import cv2
 import matplotlib.pyplot as plt
 import yaml
+
+from PIL import Image
+
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
@@ -31,29 +48,21 @@ from conversation.llm.openai_inferences import generate_answer, update_memory_ll
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.memory.utils import create_table, empty_database
 
-
 from vision.detection import detect_speaking_face
 from vision.audio import extract_and_transcribe_audio
 from vision.emotions import detect_emotions
 
-import utils 
-import base64
-import io
-import json
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
+import utils
 
 #--------------------------------------- Configuration ---------------------------------------#
 
 # Init FastAPI app
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="video_interface/static"), name="static")
 
 # Global variables for user session management
 # Load models from vision module
 model = models.YOLO_FACE_MODEL
-landmark_detector = models.LANDMARK_DETECTOR
 stt_model = models.WHISPER_MODEL
 emotion_model = models.EMOTION_MODEL
 emotion_processor = models.EMOTION_PROCESSOR
@@ -63,7 +72,7 @@ insightface_model = models.INSIGHTFACE_MODEL
 user_retriever_config = get_face_embedding_model("INSIGHTFACE")
 
 # Database connection for user retrieval
-database = 'users.db'
+database = 'video_interface/users.db'
 conn = sqlite3.connect(database)
 create_table(conn)   
 conn.close() 
@@ -83,7 +92,7 @@ async def get_home():
     """
     Serve the main HTML page for the application.
     """
-    with open("static/index.html", "r") as f:
+    with open("video_interface/static/index.html", "r") as f:
         return f.read()
     
 

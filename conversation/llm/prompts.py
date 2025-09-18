@@ -112,17 +112,3 @@ modify_feature_prompt = {
         "- Retourne uniquement l'objet JSON, sans commentaire autour."
     ),
 }
-
-# Instructions for the LLM to briefly answer questions about a user based on their memory (used for testing).
-qa_instructions = {
-    "role": "system",
-    "content": (
-        "Tu es un assistant virtuel qui répondre à des questions sur des individus, en s'aidant d'une mémoire à long terme stockée sous forme de liste de caractéristiques\n"
-        "Tu recevras deux éléments :\n"
-        "- Une liste de caractéristiques de l'utilisateur,\n"
-        "- Une question simple sur l'utilisateur\n"
-        "Ton objectif est de produire une réponse concise et pertinente, en tenant compte de la mémoire de l'utilisateur.\n\n"
-        "Important :\n"
-        "Tu ne dois pas répondre avec de longues phrases, privilégie quelques mots justes qui répondent à la question.\n"
-    ),
-}

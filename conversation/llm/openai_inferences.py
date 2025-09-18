@@ -25,12 +25,11 @@ sys.path.append(root_folder_path)
 
 from config.settings import API_KEY, LEN_HISTORY
 from memory.models import LongTermMemory, FeaturesNames
-from llm.prompts import qa_instructions, add_feature_prompt, modify_feature_prompt, reply_prompt, feature_identification_prompt
+from llm.prompts import add_feature_prompt, modify_feature_prompt, reply_prompt, feature_identification_prompt
 from llm.retriever import features_retriever, attach_embeddings
 
-# Initialize LLM client 
-client = OpenAI(api_key=API_KEY)
 
+# Initialize LLM clients 
 with open("config/config.yaml", "r") as file:
     config = yaml.safe_load(file)
 
@@ -342,33 +341,5 @@ def update_memory_llm(user_question, conn=None, current_user=None, database=None
         conn.close()
 
     return updated_ltm
-
-###########################
-
-def answer_question(question, memory):
-    """
-    Answer a question using the LLM with the provided memory.
-    This function prepares the context and sends the request to the LLM.
-    -----
-    Args:
-        question (str): The question to ask the LLM.
-        memory (list): The user's memory to be used as context.
-    Returns:
-        str: The answer from the LLM.
-    """
-    ltm = {
-        "role": "system",
-        "content": [{
-            "type": "text",
-            "text": json.dumps(memory, indent=2, ensure_ascii=False)  
-        }]
-    }
-
-    completion = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[qa_instructions, ltm, {"role": "user", "content": question}],
-    )
-
-    return completion.choices[0].message.content
 
    

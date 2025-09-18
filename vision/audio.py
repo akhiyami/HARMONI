@@ -120,16 +120,3 @@ def vad_flags_for_frames(segments, num_frames, fps, frame_stride):
         speaking = any(start <= t <= end for start, end in segments)
         flags.append(speaking)
     return flags
-
-def get_waveform(audio_path):
-    sample_rate, data = wavfile.read(audio_path)
-
-    if data.ndim > 1:
-        data = data.mean(axis=1)
-
-    # Normalize to [-1, 1] if int16
-    if data.dtype == np.int16:
-        data = data.astype(np.float32) / 32768.0
-
-    x, y = np.arange(len(data)) / sample_rate, data
-    return x, y

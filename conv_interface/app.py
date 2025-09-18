@@ -5,25 +5,21 @@ including setting users, asking questions, and retrieving answers from the LLM.
 It integrates with the memory module to store and retrieve user-specific data.
 It also handles user image for face recognition and user identification.
 ==========
-Routes:
-- `/`: Serves the main HTML page.
-- `/ask`: Handles user questions, retrieves answers from the LLM, and updates the user's memory.
-- `/set_user`: Sets the current user based on the uploaded image, performing face recognition to identify the user and retrieve their memory.
-==========
-Run the application using:
-    uvicorn app:app --reload
+Run the application in the root dir using:
+    uvicorn conv_interface.app:app --reload
 """
 
 #--------------------------------------- Imports ---------------------------------------#
 
+import os
+import time
+import json
+import yaml
 import threading
 import warnings
 import sqlite3
 from collections import deque
 from io import BytesIO
-import time
-import json
-import yaml
 
 from PIL import Image
 
@@ -37,6 +33,8 @@ from config.settings import LEN_HISTORY
 from conversation.llm.openai_inferences import generate_answer, update_memory_llm
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.memory.utils import create_table, empty_database
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
 

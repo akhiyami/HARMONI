@@ -24,8 +24,8 @@ from transformers import (
     SiglipVisionModel,
     SiglipImageProcessor,
 )
-
-from insightface.model_zoo.model_zoo import get_model as insightface_get_model
+from insightface.app  import FaceAnalysis
+from insightface.model_zoo import get_model as insightface_get_model
 
 from config.utils import suppress_stdout
 
@@ -37,30 +37,28 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 #--------------------------------------- Configuration ---------------------------------------#
 
-# Load YOLOv8 face detector
+# Load YOLOv8 face detector (deprecated, insightface used instead)
 YOLO_FACE_MODEL = YOLO(
     hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
-)
-
-# Load dlib landmark detector
-LANDMARK_DETECTOR = dlib.shape_predictor(
-    os.path.join('config/models', 'shape_predictor_68_face_landmarks.dat') 
 )
 
 # Load Whisper model
 WHISPER_MODEL = whisper.load_model("turbo")  # or parameterize this
 
-
 # Load facial emotion model
 EMOTION_PROCESSOR = AutoImageProcessor.from_pretrained("dima806/facial_emotions_image_detection")
 EMOTION_MODEL = AutoModelForImageClassification.from_pretrained("dima806/facial_emotions_image_detection")
 
-# ULIP-p16 
+
+# ULIP-p16 (deprecated, use insightface instead)
 model_name = "hamedrahimi/ULIP-p16"
 USER_RETRIEVER_MODEL = SiglipVisionModel.from_pretrained(model_name)
 USER_RETRIEVER_PROCESSOR = SiglipImageProcessor.from_pretrained(model_name)
 
 # INSIGHTFACE
 with suppress_stdout():
-    INSIGHTFACE_MODEL = insightface_get_model('buffalo_l', download=True) #FaceAnalysis(name='buffalo_l')
+    INSIGHTFACE_MODEL = insightface_get_model('buffalo_l', download=True)
+    if INSIGHTFACE_MODEL is None:
+        app = FaceAnalysis(name='buffalo_l')
+        INSIGHTFACE_MODEL = insightface_get_model('buffalo_l', download=True)
     INSIGHTFACE_MODEL.prepare(ctx_id=0)  # or -1 for CPU

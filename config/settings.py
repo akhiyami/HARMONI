@@ -17,7 +17,7 @@ if not HF_TOKEN:
     raise ValueError("Please set the HF_TOKEN environment variable.")
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
-    raise ValueError("Please set the OPENAI_API_KEY environment variable.")
+    print("Please set the OPENAI_API_KEY environment variable if you want to use OpenAI models.")
 
 # Device setup
 DEVICE = 'mps' if torch.backends.mps.is_available() else 'cpu'

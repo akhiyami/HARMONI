@@ -5,10 +5,51 @@ Post-processing functions for detected faces grids.
 #--------------------------------------- Imports ---------------------------------------#
 
 import numpy as np
+from PIL import Image
 
-from config.settings import FILTER_THRESHOLD
+from config.settings import FILTER_THRESHOLD, LEN_FRAME_BUFFER
 
 #--------------------------------------- Functions ---------------------------------------#
+
+def iou(box1, box2):
+    """
+    Calculate Intersection over Union (IoU) between two bounding boxes.
+    Args:
+        box1 (list): Bounding box in the format [x1, y1, x2, y2].
+        box2 (list): Bounding box in the format [x1, y1, x2, y2].
+    Returns:
+        float: IoU value between 0 and 1.
+    """
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+    
+    intersection = max(0, x2 - x1) * max(0, y2 - y1)
+    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    
+    union = area_box1 + area_box2 - intersection
+    return intersection / union if union > 0 else 0
+
+def recognize_face(current_faces, new_face):
+    """
+    Recognize a new face by comparing it with existing faces in the current_faces list.
+    Args:
+        current_faces (list): List of current faces, each face is a deque of bounding boxes.
+        new_face (list): New face bounding box in the format [x1, y1, x2, y2].
+    Returns:
+        int: Index of the recognized face in current_faces, or None if not recognized.
+    """
+    #current_faces list of deque
+    for i, faces in enumerate(current_faces):
+        if faces is None:
+            continue
+        last_position = [face for face in faces if face is not None][-1]
+
+        if iou(last_position, new_face) > 0.5:
+            return i        
+    return None
 
 def remove_outliers(grid, sparsity, lips_landmarks_grid):
     """
@@ -65,22 +106,50 @@ def stitch_sequences(grid, sparsity, lips_landmarks_grid):
 
     return stitched_face_grid, stitched_sparsity, stitched_lips_landmarks_grid
 
-
-def _mouth_from_landmarks(lm):
+def remove_stale_faces(current_faces, face_images, updated_idx):
     """
-    lm: np.array shape (M,2) with M >= 20 (mouth-only or full 68)
-    returns a (20,2) mouth array
+    Remove faces that have not been updated for a while.
     """
-    arr = np.asarray(lm, dtype=np.float32)
-    if arr.ndim != 2 or arr.shape[1] != 2:
-        raise ValueError(f"landmarks must be (M,2), got shape {arr.shape}")
-    if arr.shape[0] == 20:
-        return arr.copy()
-    elif arr.shape[0] >= 68:
-        return arr[48:68].copy()
-    else:
-        # fallback: if the array is weird size, try to return last 20 rows
-        if arr.shape[0] >= 20:
-            return arr[-20:].copy()
-        raise ValueError(f"unsupported landmark size: {arr.shape[0]}")
+    # Get the indices of the faces that have not been updated this frame
+    nn_idx = [k for k, updated in enumerate(updated_idx) if updated is None]
+    for idx in nn_idx:
+        if current_faces[idx] is None:
+            continue
+        current_faces[idx].append(None)  # Indicate this face has not been detected
+        if sum(face is None for face in current_faces[idx]) == LEN_FRAME_BUFFER:
+            # If face not seen for LEN_FRAME_BUFFER frames, remove it
+            current_faces[idx] = None
+            face_images[idx] = Image.fromarray(np.zeros(face_images[idx].size, dtype=np.uint8))
 
+
+def build_face_grids(frames_stack):
+    """
+    Build grids of face images, sparsity information, and lips landmarks from the frames stack.
+    """
+    # Define three different grids to store the face images, sparsity info, and lips landmarks
+    # Collect all unique face indices (keys) across frames_stack
+    keys = np.unique([k for frames in frames_stack if frames for k in frames.keys()])
+
+    # frames_stack[frame_idx][face_idx] = (img_rgb, landmarks)
+
+    n_faces = len(keys)
+    n_frames = len(frames_stack)
+
+    face_grid = np.zeros((n_frames, n_faces), dtype=object)
+    sparsity = np.zeros((n_frames, n_faces), dtype=bool)  # Indicates if face is detected in a frame
+    landmarks_grid = np.zeros((n_frames, n_faces), dtype=object)
+
+    # Fill the grids
+    for i, frames in enumerate(frames_stack):
+        for j, key in enumerate(keys):
+            if key in frames:
+                sparsity[i, j] = True
+                # Draw landmarks on the face image
+                face_img, landmarks = np.array(frames[key][0]).copy(), frames[key][1]
+                face_grid[i, j] = Image.fromarray(face_img)
+                landmarks_grid[i, j] = landmarks
+
+            else:
+                face_grid[i, j] = Image.fromarray(np.zeros((100, 100, 3), dtype=np.uint8))
+
+    return face_grid, sparsity, landmarks_grid

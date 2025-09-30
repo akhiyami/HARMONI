@@ -1,0 +1,26 @@
+# Memory Module Configuration
+memory: 
+  closed_vocabulary: True
+  vocabulary: 
+    Personnalité: "Les traits de personnalité de l'utilisateur, son caractère et son comportement."
+    Intérêts: "Les centres d'intérêt de l'utilisateur."
+    Emploi: "Les informations professionnelles de l'utilisateur, y compris son emploi actuel et son parcours professionnel."
+    Education: "Le parcours éducatif de l'utilisateur, y compris les établissements fréquentés et les diplômes obtenus."
+    Famille: "Les membres de la famille de l'utilisateur, y compris les relations et les dynamiques familiales."
+    Relations: "Les relations interpersonnelles de l'utilisateur, y compris les amis, les collègues et les connaissances."
+    Loisirs: "Les activités de loisirs et les passe-temps de l'utilisateur, y compris les sports, les arts et les voyages."
+    Santé: "Les informations sur la santé de l'utilisateur, y compris les conditions médicales et le bien-être général."
+    Emploi_du_temps: "L'emploi du temps de l'utilisateur, y compris les engagements professionnels et personnels."
+    Habitudes: "Les habitudes de l'utilisateur, y compris les routines quotidiennes et les comportements répétitifs."
+    Alimentation: "Les habitudes alimentaires de l'utilisateur, y compris les préférences, les allergies et les régimes alimentaires."
+    Technologie: "Le rapport de l'utilisateur avec la technologie, y compris les appareils utilisés et les compétences numériques."
+
+#llm configuration
+reply-llm:
+  model: "gpt-4o"
+  temperature: 0
+  max_tokens: -1
+memory-llm:
+  model: "gpt-4o"
+  temperature: 0
+  max_tokens: -1

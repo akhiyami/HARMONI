@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="static/style.css">
+    <script src="static/script.js" defer></script>
+</head>
+
+<body>
+    <header>
+        <h1>Assistant Virtuel</h1>
+    </header>
+
+    <div id="verifBackground" class="background">
+        <div id="verifWindow" class="window">
+            <h2 style="margin:0; padding:0;">Are you sure you want to reset the database?</h2>
+            <p>This will delete all data in the database.</p>
+            <p>Do you want to continue?</p>
+            <div class="window_buttons">
+                <button id="confirmResetBtn" class="green_button">Yes, reset</button>
+                <button id="cancelResetBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="userSelectBackground" class="background">
+        <div id="userSelectWindow" class="window">
+            <h2 style="margin:0; padding:0;">Select the User image</h2>
+
+            <div class="window_buttons">
+                <button id="selectUserImageBtn" class="blue_button">Select a picture</button>
+                <button id="takeUserImageBtn" class="blue_button">Take a picture</button>
+                <button id="cancelUserImageBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+        <div id="cameraWindow" class="window">
+            <h2 style="margin:0; padding:0;">Take a picture</h2>
+            <video id="video" autoplay></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <image id="capturedImage" alt="Captured Image"/>    
+
+            <div class="window_buttons">
+                <button id="saveImageBtn" class="green_button">Confirm</button>
+                <button id="retakeBtn" class="blue_button">Retake</button>
+                <button id="captureBtn" class="blue_button">Capture</button>
+                <button id="stopCameraBtn" class="red_button">Cancel</button>
+            </div>
+            
+        </div>
+    </div>
+
+    <div id="contextBackground" class="background">
+        <div id="contextWindow" class="window">
+            <h2 style="margin:0; padding:0;">Modify Context</h2>
+            <p>Enter the new context for the user:</p>
+            <textarea id="contextInput" rows="8" cols="70"></textarea>
+            <div class="window_buttons">
+                <button id="saveContextBtn" class="green_button">Save</button>
+                <button id="cancelContextBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="databaseBackground" class="background">
+
+        <div id="userWindow" class="window">
+            <h2 style="margin:0; padding:0;">Edit User Profile</h2>
+
+            <div id="edit_user_box" class="edit_user_box">
+                <div class = container>
+                    <table id="edit_profile">
+                        <thead></thead>
+                        <tbody id="features-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="window_buttons">
+                <button id="saveUserBtn" class="green_button">Save User</button>
+                <button id="importProfileBtn" class="blue_button" onclick="document.getElementById('profileInput').click();">Import profile</button>
+                <input type="file" id="profileInput" accept=".json,application/json" style="display:none;" onchange="handleProfileSelect(event)">
+                <button id="addFeatureBtn" class="blue_button">Add Feature</button>
+                <button id="cancelUserBtn" class="grey_button">Cancel</button>
+            </div>
+            
+        </div>
+
+        <div id='featureWindow' class="window">
+            <h2>Add New Feature</h2>
+            <form id="add-feature-form">
+                <label for="feature-name">Feature Name:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="name-container">
+                    <!-- will be replaced dynamically -->
+                </div>
+
+                <label for="feature-description">Description:</label>
+                <div class="pill-container">
+                    <input type="text" id="feature-description" name="feature-description"
+                        placeholder="Type description here..." maxlength="200">
+                </div>
+
+                <label for="feature-values">Values:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="values-container">
+                    <input type="text" id="feature-values-input" placeholder="Type value and press Enter">
+                </div>
+                <input type="hidden" id="feature-values" name="feature-values" required>
+
+                <div class="window_buttons">
+                    <button type="submit" id="save-feature-btn" class="green_button">Save Feature</button>
+                    <button type="button" id="cancel-feature-btn" class="grey_button">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- Section utilisateur : image et profil -->
+    <div id="user_info">
+        
+        <!-- User image and selection button -->
+        <div id="user">
+            <div id="user_placeholder" class="user-image-box">
+                <img src="static/image_pholder.png" alt="Image de l'utilisateur actif">
+            </div>
+            <div id="user_image" class="user-image-box">
+                <img id="preview" src="" alt="Image de l'utilisateur actif">
+            </div>
+
+            <div class="user-label-container">
+                <button type="button" class="user_button" onclick="selectUser()">
+                    Select User
+                </button>
+                <input type="file" id="imageInput" accept="image/*" style="display:none;" onchange="handleImageSelect(event)">
+
+                <button type="button" id="editDatabaseBtn" class="edit_button" onclick="editDatabase()" disabled>Edit User</button>
+                
+            </div>
+
+        </div>
+        
+        <!-- User profile (live updated) -->
+        <div id="profile">
+            <h3 style="margin:0; padding:0.5rem">A propos :</h3>
+            <span id="live_profile"></span>
+        </div>
+
+        <div class="buttons_area">
+            <div class="save_experience">
+                <button id="expe_button" class="green_button" onclick="saveExperiment()">Save Experience</button>
+            </div>
+            <div>
+            </div>
+            <div class="change_context">
+                <button id="context_button" class="blue_button" onclick="changeContext()">Modify Context</button>
+            </div>
+            <div id="reset_session">
+                <button id="resetSessionBtn" class="blue_button" onclick="resetSession()">Reset Session</button>
+            </div>
+            <div class="restart_system">
+                <button id="restartSystemBtn" class="red_button" onclick="restartSystem()">Restart System</button>
+            </div>
+            <div class="reset_database">
+                <button id="resetDatabaseBtn" class="red_button" onclick="verifCleanDatabase()">Reset Database</button>
+            </div>
+            
+        </div>
+
+    </div>
+
+    <!-- Chatbox (conversation session) -->
+    <div id="chatbox" style="position: relative;">
+        <button id="changeFontSize" style="position: absolute; top: 10px; right: 10px; z-index: 1;" onclick="changeFontSize()">Grandir le texte</button>
+    </div>
+
+    <!-- Chat form for user input -->
+    <form id="chat-form">
+        <textarea id="question" required placeholder="Entrez votre question..."></textarea>
+        <button id="sendBtn" class="submit">Envoyer</button>
+    </form>
+    
+</body>
+
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="static/style.css">
+    <script src="static/script.js" defer></script>
+</head>
+
+<body>
+
+    <!-- Pop ups windows -->
+    <div id="processingOverlay" class="processing">
+        <div class="processing-text">
+            <div>Processing video...</div>
+            <div class="loader"></div>
+        </div>
+    </div>
+
+    <div id="logs">
+        <button id="closeLogsBtn" aria-label="Close logs">&times;</button>
+        <h1 style="text-align: center;">Logs</h1>
+        <div id="log_content">Nothing to show yet</div>
+    </div>
+
+
+    <div id="contextBackground" class="background">
+        <div id="contextWindow" class="window">
+            <h2 style="margin:0; padding:0;">Modify Context</h2>
+            <p>Enter the new context for the user:</p>
+            <textarea id="contextInput" rows="8" cols="70"></textarea>
+            <div class="window_buttons">
+                <button id="saveContextBtn" class="green_button">Save</button>
+                <button id="cancelContextBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="verifBackground" class="background">
+    <div id="verifWindow" class="window">
+        <h2 style="margin:0; padding:0;">Are you sure you want to reset the database?</h2>
+        <p>This will delete all data in the database.</p>
+        <p>Do you want to continue?</p>
+        <div class="window_buttons">
+            <button id="confirmResetBtn" class="green_button">Yes, reset</button>
+            <button id="cancelResetBtn" class="grey_button">Cancel</button>
+        </div>
+    </div>
+    </div>
+
+
+    <div id="databaseBackground" class="background">
+        <div id="databaseWindow" class="window">
+            <h2 style="margin:0; padding:0;">User Database Edition</h2>
+            <p>Enter a picture of the user to modify:</p>
+            <img id="selected_user_preview" src="" alt="Selected user preview" style="display:none; max-width: 100%; max-height: 200px;">
+            <div class="window_buttons">
+                <button id="editUserBtn" class="green_button">Edit User</button>
+                <div class="browse_file">
+                    <label id="userLabel" for="userImageInput" class="browse_button">Select User</label>
+                    <input type="file" id="userImageInput" accept="image/*" onchange="handleUserImageSelect(event)">
+                </div>
+                <button id="cancelDatabaseBtn" class="grey_button">Cancel</button>
+            </div>
+        </div>
+        <div id="userWindow" class="window">
+            <h2 style="margin:0; padding:0;">Edit User Profile</h2>
+
+            <div id="edit_user_box" class="edit_user_box">
+                <div id="edit_user" class="edit_user">
+                    <img id="edit_user_image" src="" alt="Aperçu de l'utilisateur édité">
+                    <span id="edit_user_label" class="user_label"></span>
+                </div>
+
+                <div class = container>
+                    <table id="edit_profile">
+                        <thead></thead>
+                        <tbody id="features-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="window_buttons">
+                <button id="saveUserBtn" class="green_button">Save User</button>
+                <button id="addFeatureBtn" class="blue_button">Add Feature</button>
+                <button id="cancelUserBtn" class="grey_button">Cancel</button>
+            </div>
+            
+        </div>
+
+        <div id='featureWindow' class="window">
+            <h2>Add New Feature</h2>
+            <form id="add-feature-form">
+                <label for="feature-name">Feature Name:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="name-container">
+                    <!-- will be replaced dynamically -->
+                </div>
+
+                <label for="feature-description">Description:</label>
+                <div class="pill-container">
+                    <input type="text" id="feature-description" name="feature-description"
+                        placeholder="Type description here..." maxlength="200">
+                </div>
+
+                <label for="feature-values">Values:<span style="color: red;">*</span></label>
+                <div class="pill-container" id="values-container">
+                    <input type="text" id="feature-values-input" placeholder="Type value and press Enter">
+                </div>
+                <input type="hidden" id="feature-values" name="feature-values" required>
+
+                <div class="window_buttons">
+                    <button type="submit" id="save-feature-btn" class="green_button">Save Feature</button>
+                    <button type="button" id="cancel-feature-btn" class="grey_button">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+
+    <!-- Input video section -->
+    <div id="user_container">
+
+        <!-- Video and selection button -->
+        <div id="video_container">
+            <div id="video_placeholder" class="video-box">
+                <img src="static/video_pholder.png" alt="Aperçu de la vidéo d'entrée">
+            </div>
+            <video id="video_preview" src="" alt="Vidéo de l'utilisateur actif" controls></video>
+
+            <div class="buttons_video">
+                
+                <div class="change_context">
+                    <button id="context_button" class="blue_button" onclick="changeContext()">Modify Context</button>
+                </div>
+                <div id="change_video" class="browse_file">
+                    <label for="videoInput" class="browse_button">Change video</label>
+                    <input type="file" id="videoInput" accept="video/*" onchange="handleVideoSelect(event)">
+                </div>
+                <div class="show_logs">
+                    <button id="show_logs_button" class="blue_button" onclick="showLogs()" disabled>Show logs</button>
+                </div>
+
+            </div>
+        </div>
+        
+        <!-- User profile (live updated) -->
+
+        <div id="user_box" class="user_box">
+            <div id="user" class="user_img">
+                <img id="user_placeholder" src="static/user_pholder.png" alt="Aperçu de l'utilisateur actif">
+                <img id="user_preview" src="" alt="Aperçu de l'utilisateur actif" style="display:none;">
+                <span id="user_label" class="user_label"></span>
+                
+            </div>
+            <div id="profile" class="profile">
+                <span id="profile_label" class="profile_label">A propos :</span><br><br>
+                <span id="live_profile" class="live_profile"></span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Conversation session -->
+    <div id="chatbox"></div>
+
+    <!-- Session reset button -->
+     <div class="reset_area">
+        <div id="reset_session">
+            <button id="resetSessionBtn" class="green_button" onclick="resetSession()">Reset Session</button>
+        </div>
+        <div class="edit_database">
+            <button id="editDatabaseBtn" class="blue_button" onclick="editDatabase()">Edit Database</button>
+        </div>
+        <div id="reset_database">
+            <button id="resetDatabaseBtn" class="red_button" onclick="verifCleanDatabase()">Reset Database</button>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,12 +1,22 @@
 ### Git ignore file for Python projects
 
 # Projet-specific files
-users.json
-users.db
-/data
-/static/users_images
+conv_interface/static/users_images/
 test.ipynb
-inference.ipynb
+conversation/inference.ipynb
+results/
+tests.ipynb
+data/
+output.html
+names_only.txt
+models/
+tests/
+stream
+evaluations/
+evaluation/config/
+
+*.db
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -142,6 +152,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv*
 env/
 venv/
 ENV/

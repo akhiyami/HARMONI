@@ -49,6 +49,9 @@ WHISPER_MODEL = whisper.load_model("turbo")  # or parameterize this
 EMOTION_PROCESSOR = AutoImageProcessor.from_pretrained("dima806/facial_emotions_image_detection")
 EMOTION_MODEL = AutoModelForImageClassification.from_pretrained("dima806/facial_emotions_image_detection")
 
+###################
+# FACE EMBEDDINGS
+###################
 
 # ULIP-p16 (deprecated, use insightface instead)
 model_name = "hamedrahimi/ULIP-p16"

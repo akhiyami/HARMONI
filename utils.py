@@ -4,6 +4,7 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objs as go
+import cv2
 
 
 # === Utility ===
@@ -65,13 +66,15 @@ def display_image_grid_html(grid, titles, best_idx=None, jupyter=True):
     for row in range(N):
         highlight = "border: 3px solid #66ad39;" if best_idx == row else ""
         html += f'<tr style="text-align: center; font-weight: bold; width:100%; {highlight}">'
-        for col in range(M):
-            img_b64 = image_to_base64(np.array(grid[col, row]))
+        for col in range(min(18, M)):
+            #blur all the images
+            img= np.array(grid[col, row].copy())
+            img_b64 = image_to_base64(np.array(img))
             html += f'<td style="padding: 0.3%;"><img src="data:image/png;base64,{img_b64}" style="max-width: 100%; height: auto;"></td>'
         html += '</tr>'
 
         color = "#4a8723" if best_idx == row else "#888888"
-        html += f'<tr style="text-align: center;"><td colspan="{M}" style="color: {color}; font-weight: bold;">Speaking probability: {titles[row]}</td></tr>'
+        html += f'<tr style="text-align: center;"><td colspan="{M}" style="color: {color}; font-weight: bold;">Speaking probability: {float(titles[row]):.2f}</td></tr>'
 
         if row < N - 1:
             html += f'<tr><td colspan="{M}"><hr style="border: 1px solid #ccc; width: 10%; margin-bottom: 0.8%;"></td></tr>'

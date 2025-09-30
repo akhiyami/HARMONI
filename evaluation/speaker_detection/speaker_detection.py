@@ -32,6 +32,7 @@ os.makedirs(results_dir, exist_ok=True)
 
 detect_face_time = 0
 user_retrieval_time = 0
+speaker_id_time = 0
 
 for video in tqdm(videos):
     print(f"Processing video: {video}")
@@ -41,17 +42,15 @@ for video in tqdm(videos):
     video_capture = cv2.VideoCapture(os.path.join(videos_path, video))
     if video_capture.isOpened():
         video_duration = video_capture.get(cv2.CAP_PROP_FRAME_COUNT) / video_capture.get(cv2.CAP_PROP_FPS)
+        n_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
     video_capture.release()
 
-    print(video_duration)
-
     start_time = time.time()
-    speaking_face_row, grid, probs = detect_speaking_face(video_path=os.path.join(videos_path, video), save_frames=False, verbose=False)
-    detect_face_time += time.time() - start_time
+    speaking_face_row, grid, probs, speaker_time = detect_speaking_face(video_path=os.path.join(videos_path, video), save_frames=False, verbose=False)
 
-    print(time.time() - start_time)
+    detect_face_time += (time.time() - start_time - speaker_time) / n_frames
+    speaker_id_time += speaker_time 
     best_idx = np.argmax(probs)
-
 
     result_dir_video = os.path.join(results_dir, video[:-4])
     os.makedirs(result_dir_video, exist_ok=True)
@@ -92,6 +91,9 @@ for video in tqdm(videos):
 
 user_retrieval_time /= len(videos)
 detect_face_time /= len(videos)
+speaker_id_time /= len(videos)
 
-print(f"Average time to detect speaking face: {detect_face_time:.2f} seconds")
-print(f"Average time to retrieve user: {user_retrieval_time:.2f} seconds")
+print(f"Average time to detect speaking face: {detect_face_time:.4f} seconds")
+print(f"Average time to retrieve user: {user_retrieval_time:.4f} seconds")
+print(f"Average time for speaker identification: {speaker_id_time:.4f} seconds")
+

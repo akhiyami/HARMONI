@@ -36,21 +36,30 @@ with open("config/config.yaml", "r") as file:
 reply_model = config.get("reply-llm", {}).get("model", "")
 memory_model = config.get("memory-llm", {}).get("model", "")
 
-if reply_model.startswith("gpt") and "oss" not in reply_model:
+use_openai_client = {"reply": False, "memory": False}
+if API_KEY:
+    openai_client = OpenAI(api_key=API_KEY)
+    available_models = [model.id for model in openai_client.models.list().data]
+    if reply_model in available_models:
+        use_openai_client["reply"] = True
+    if memory_model in available_models:
+        use_openai_client["memory"] = True
+
+if use_openai_client["reply"]:
     reply_client = OpenAI(api_key=API_KEY)
 else: 
     try:
         reply_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
     except Exception as e:
-        print(f"Error initializing local LLM client. Did you start the Ollama server?\nException: {e}")
+        print(f"Error initializing local LLM client.\n{e}")
 
-if memory_model.startswith("gpt") and "oss" not in memory_model:
+if use_openai_client["memory"]:
     memory_client = OpenAI(api_key=API_KEY)
 else: 
     try:
         memory_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
     except Exception as e:
-        print(f"Error initializing local LLM client. Did you start the Ollama server?\nException: {e}")
+        print(f"Error initializing local LLM client.\n{e}")
 
 
 #--------------------------------------- Functions for interacting with the LLM ---------------------------------------#

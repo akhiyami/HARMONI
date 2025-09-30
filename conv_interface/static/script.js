@@ -15,7 +15,15 @@ let userId = ""; // Default user ID
 // Empty the chat form input
 questionInput.value = ""
 
-// Event listener for form submission
+// Gestion clavier : Enter = submit, Shift+Enter = nouvelle ligne
+questionInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();   // Empêche le saut de ligne
+        form.requestSubmit(); // Soumet le formulaire
+    }
+});
+
+// Ton comportement existant
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const question = questionInput.value.trim();
@@ -25,13 +33,12 @@ form.addEventListener("submit", async (e) => {
 
     if (!user) {
         addMessage("Erreur", "Veuillez sélectionner un utilisateur actif.", "error");
-        questionInput.value = ""
         return;
     }
 
     if (!question) return;
 
-    addMessage(user, question, "user");
+    addMessage("Vous", question, "user");
 
     const response = await fetch("/ask", {
         method: "POST",
@@ -49,7 +56,6 @@ form.addEventListener("submit", async (e) => {
     if (!data.profile) {
         live_profile.innerHTML = "";
     } else {
-        // Separate primary and contextual items
         const primary = data.profile.filter(item => item.type === "primary");
         const contextual = data.profile.filter(item => item.type === "contextual");
 
@@ -67,23 +73,57 @@ form.addEventListener("submit", async (e) => {
         }
         live_profile.innerHTML = html;
     }
-    
 });
 
-// Function to add a message to the chatbox
+function formatMarkdown(text) {
+    // Remplacer les sauts de ligne doubles par des paragraphes
+    let html = text.split('\n\n').map(paragraph => paragraph.trim()).join('</p><p>');
+    html = `<p style="margin: 0.2em 0;">${html}</p>`;
+
+    // Gras **texte**
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Italique *texte*
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // replace \n with <br> for single line breaks
+    html = html.replace(/\n/g, '<br>');
+
+    //replace mutliple spaces with &nbsp;
+    html = html.replace(/  /g, '&nbsp;&nbsp;');
+
+    return html;
+}
+
 function addMessage(sender, text, role) {
     const div = document.createElement("div");
     div.className = `msg ${role}`;
-    div.textContent = `${sender}: ${text}`;
+    if (role === "user" || role === "bot") {
+        div.innerHTML = `<strong style="margin-left: 1em; font-size:1.1em">${sender}:</strong> ` + formatMarkdown(text);
+    } else {
+        div.innerHTML = `<em>${sender}:</em> ` + text;
+    }
     chatbox.appendChild(div);
     chatbox.scrollTop = chatbox.scrollHeight;
+} 
+
+function changeFontSize() {
+    // Example: get the value of a CSS variable --font-size from :root
+    const rootStyles = getComputedStyle(document.documentElement);
+    const fontSize = rootStyles.getPropertyValue('--user-font-size').trim();
+    if (fontSize === "18px") {
+        document.documentElement.style.setProperty('--user-font-size', '24px');
+        document.getElementById("changeFontSize").textContent = "Réduire le texte";
+    } else {
+        document.documentElement.style.setProperty('--user-font-size', '18px');
+        document.getElementById("changeFontSize").textContent = "Grandir le texte";
+    }
 }
 
 function populateTableFromProfile(userProfile) {
     const table = document.getElementById("edit_profile");
     const thead = table.querySelector("thead");
     const tbody = table.querySelector("tbody");
-
     // Clear existing content
     thead.innerHTML = "";
     tbody.innerHTML = "";
@@ -124,6 +164,7 @@ function populateTableFromProfile(userProfile) {
 function handleImageSelect(event) {
     const file = event.target.files[0];
     const preview = document.getElementById('preview');
+    const user_image = document.getElementById('user_image');
     const userPlaceholder = document.getElementById('user_placeholder');
     const editButton = document.getElementById('editDatabaseBtn');
     if (file) {
@@ -132,6 +173,7 @@ function handleImageSelect(event) {
             preview.src = e.target.result;
             
             if (userPlaceholder.style.display !== 'none') {
+                user_image.style.display = 'block';
                 preview.style.display = 'inline';
                 userPlaceholder.style.display = 'none';
                 editButton.disabled = false; // Enable the edit button
@@ -180,8 +222,213 @@ function handleImageSelect(event) {
     } else {
         preview.src = '';
         preview.style.display = 'none';
+        user_image.style.display = 'none';
     }
 }
+
+function selectUser() {
+    user_select_background = document.getElementById('userSelectBackground');
+    user_select_window = document.getElementById('userSelectWindow');
+    camera_window = document.getElementById('cameraWindow');
+
+    user_select_background.style.display = 'block';
+    user_select_window.style.display = 'block';
+    camera_window.style.display = 'none';
+
+    document.getElementById('cancelUserImageBtn').onclick = function() {
+        user_select_background.style.display = 'none';
+        user_select_window.style.display = 'none';
+    };
+
+
+    document.getElementById('selectUserImageBtn').onclick = function() {
+        document.getElementById('imageInput').click();
+        user_select_background.style.display = 'none';
+        user_select_window.style.display = 'none';
+    };
+
+    document.getElementById('takeUserImageBtn').onclick = function() {
+        openCamera();
+        user_select_window.style.display = 'none';
+        camera_window.style.display = 'block';
+
+    }
+}
+let cameraStream = null;
+
+function openCamera() {
+    const cameraWindow = document.getElementById('cameraWindow');
+    const video = document.getElementById('video');
+    const captured_image = document.getElementById('capturedImage');
+    document.getElementById('saveImageBtn').style.display = 'none';
+    document.getElementById('retakeBtn').style.display = 'none';
+    document.getElementById('captureBtn').style.display = 'inline-block';
+
+    cameraWindow.style.display = 'block';
+    captured_image.style.display = 'none';
+    video.style.display = 'block';
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            cameraStream = stream;
+            video.srcObject = stream;
+        })
+        .catch(err => alert("Could not access camera: " + err));
+}
+
+document.getElementById('stopCameraBtn').addEventListener('click', () => {
+    const video = document.getElementById('video');
+    const cameraWindow = document.getElementById('cameraWindow');
+    const userSelectWindow = document.getElementById('userSelectWindow');
+    const captured_image = document.getElementById('capturedImage');
+
+    userSelectWindow.style.display = 'block';
+    cameraWindow.style.display = 'none';
+    video.style.display = 'none';
+    captured_image.style.display = 'none';
+    captured_image.src = '';
+
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+})
+
+function dataURLtoBlob(dataURL) {
+  const arr = dataURL.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
+
+document.getElementById('captureBtn').addEventListener('click', () => {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const imageDataURL = canvas.toDataURL('image/png');
+
+    video.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('image', dataURLtoBlob(imageDataURL), 'capture.png');
+
+    fetch('/face_detection', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                video.style.display = 'block';
+            } else if (data.bounding_box) {
+                const bounding_box = data.bounding_box;
+                const croppedFace = document.createElement('canvas');
+                croppedFace.width = bounding_box.width;
+                croppedFace.height = bounding_box.height;
+                const ctx = croppedFace.getContext('2d');
+
+                // Use the canvas snapshot, not video
+                ctx.drawImage(
+                    canvas,
+                    bounding_box.x, bounding_box.y, bounding_box.width, bounding_box.height,
+                    0, 0, bounding_box.width, bounding_box.height
+                );
+
+                const croppedFaceDataURL = croppedFace.toDataURL('image/png');
+                document.getElementById('capturedImage').src = croppedFaceDataURL;
+                document.getElementById('capturedImage').style.display = 'block';
+
+                const captureBtn = document.getElementById('captureBtn');
+                captureBtn.style.display = 'none';
+                document.getElementById('saveImageBtn').style.display = 'inline';
+                document.getElementById('retakeBtn').style.display = 'inline';
+
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }   
+            }
+        })
+        .catch(error => {
+            console.error("Error during face detection:", error);
+        });
+
+    });
+
+document.getElementById('retakeBtn').addEventListener('click', () => {
+    openCamera();
+});
+
+document.getElementById('saveImageBtn').addEventListener('click', () => {
+    const capturedImage = document.getElementById('capturedImage');
+    const preview = document.getElementById('preview');
+    const user_image = document.getElementById('user_image');
+    const userPlaceholder = document.getElementById('user_placeholder');
+    const editButton = document.getElementById('editDatabaseBtn');
+
+    if (capturedImage.src) {
+        preview.src = capturedImage.src;
+        capturedImage.style.display = 'none';
+        capturedImage.src = '';
+
+        if (userPlaceholder.style.display !== 'none') {
+            preview.style.display = 'inline';
+            user_image.style.display = 'block';
+            userPlaceholder.style.display = 'none';
+            editButton.disabled = false; // Enable the edit button
+        }
+
+        document.getElementById('cameraWindow').style.display = 'none';
+        document.getElementById('userSelectBackground').style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('image', dataURLtoBlob(preview.src), 'user_image.png');
+
+        fetch('/set_user', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            addMessage("Change user", data.user_id, "system");
+            userId = data.user_id; 
+
+            if (!data.profile) {
+                live_profile.innerHTML = "";
+            } else {
+                const primary = data.profile.filter(item => item.type === "primary");
+                const contextual = data.profile.filter(item => item.type === "contextual");
+
+                let html = "";
+                if (primary.length > 0) {
+                    html += primary.map(
+                        item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value} `
+                    ).join('<br>');
+                }
+                if (contextual.length > 0) {
+                    if (primary.length > 0) html += "<br>----------<br>";
+                    html += contextual.map(
+                        item => `<b>${item.name}:</b> <span style="color:gray"><em>(${item.description})</em></span> </br>${item.value}`
+                    ).join('<br>');
+                }
+                live_profile.innerHTML = html;
+            }
+        })
+        .catch(error => {
+            console.error('Error setting user:', error);
+            addMessage("Erreur", "Erreur lors de la mise à jour de l'utilisateur actif.", "error");
+        });
+    }
+});
 
 // ====================
 // Clean database
@@ -205,6 +452,35 @@ function verifCleanDatabase() {
         verifWindow.style.display = 'none';
     };
 }
+function restartSystem() {
+    fetch('/restart_system', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "success") {
+            // Remove all chatbox children except the button(s)
+            Array.from(chatbox.children).forEach(child => {
+                if (!(child.tagName === "BUTTON")) {
+                    chatbox.removeChild(child);
+                }
+            });
+            
+            addMessage('System', 'System restarted successfully', 'system');
+            userId = "";
+            live_profile.innerHTML = "";
+            const preview = document.getElementById('preview');
+            const user_image = document.getElementById('user_image');
+            const userPlaceholder = document.getElementById('user_placeholder');
+            const editButton = document.getElementById('editDatabaseBtn');
+
+            preview.style.display = 'none';
+            user_image.style.display = 'none';
+            userPlaceholder.style.display = 'block';
+            editButton.disabled = true; // Disable the edit button
+        }
+    });
+}
 
 function resetDatabase() {
     fetch('/reset_database', {
@@ -214,6 +490,17 @@ function resetDatabase() {
     .then(data => {
         if (data.status === "success") {
             resetSession();
+            userId = "";
+            live_profile.innerHTML = "";
+            const preview = document.getElementById('preview');
+            const user_image = document.getElementById('user_image');
+            const userPlaceholder = document.getElementById('user_placeholder');
+            const editButton = document.getElementById('editDatabaseBtn');
+
+            preview.style.display = 'none';
+            user_image.style.display = 'none';
+            userPlaceholder.style.display = 'block';
+            editButton.disabled = true; // Disable the edit button
         }
     });
 }
@@ -225,7 +512,11 @@ function resetSession() {
     .then(response => response.json())
     .then(data => {
         if (data.status === "success") {
-            chatbox.innerHTML = "";
+            Array.from(chatbox.children).forEach(child => {
+                if (!(child.tagName === "BUTTON")) {
+                    chatbox.removeChild(child);
+                }
+            });
 
             addMessage("System", "Session has been reset.", "system");
         }
@@ -377,6 +668,18 @@ async function editDatabase() {
 
 }
 
+function handleProfileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const contents = e.target.result;
+            const profileData = JSON.parse(contents);
+            populateTableFromProfile(profileData);
+        };
+        reader.readAsText(file);
+    }
+}
 
 // Table features work
 document.addEventListener("DOMContentLoaded", function () {
@@ -667,3 +970,16 @@ function setupPillInput(containerId, inputId, hiddenId, triggerKeys) {
 
     container.addEventListener("click", () => input.focus());
 }      
+
+
+function saveExperiment() {
+    fetch('/save_experiment', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "success") {
+            addMessage("System", "Experiment has been saved.", "system");
+        }
+    });
+}

@@ -33,8 +33,8 @@ from vision.audio import get_vad_segments, vad_flags_for_frames, extract_mono_wa
 #--------------------------------------- Initialization ---------------------------------------#
 
 with suppress_stdout():
-    app = FaceAnalysis(allowed_modules=['detection', 'landmark_2d_106'])
-    app.prepare(ctx_id=0, det_size=(640, 640))
+    FACE_APP = FaceAnalysis(allowed_modules=['detection', 'landmark_2d_106'])
+    FACE_APP.prepare(ctx_id=0, det_size=(640, 640))
 
 #--------------------------------------- Functions ---------------------------------------#
         
@@ -90,7 +90,9 @@ def detect_speaking_face(video_path, save_frames=False, verbose=True):
     face_grid, sparsity, landmarks_grid = stitch_sequences(face_grid, sparsity, landmarks_grid)
 
     # Process the face grid to compute the speaking probability for each face
+    speaker_start_time = time.time()
     speaking_user, speaking_probs = identify_speaking_face(face_grid, sparsity, landmarks_grid, save_frames, vad_flags, verbose)
+    speaker_time = time.time() - speaker_start_time
 
     process_video_time = time.time() - start_time
 
@@ -112,7 +114,7 @@ def process_detections(frame, current_faces, face_images, frames_stack, i):
         i (int): Current frame index.
     """
     # Initialize InsightFace app for face detection
-    faces = app.get(frame)
+    faces = FACE_APP.get(frame)
 
     # # Run YOLO inference
     # output = model(frame)
@@ -320,3 +322,25 @@ def identify_speaking_face(face_grid, sparsity, landmarks_grid, save_frames, vad
         print(f"The speaker is the person number {speaking_user}, with a speaking probability of {probs[speaking_user]:.2f}.")
 
     return speaking_user, probs
+
+
+def detect_faces_image(image):
+    """
+    Detect faces in a single image using InsightFace.
+    Args:
+        image (PIL.Image or numpy.ndarray): Input image.
+    Returns:
+        list: List of bounding boxes for detected faces.
+    """
+    if isinstance(image, Image.Image):
+        image = np.array(image)
+
+    faces = FACE_APP.get(image)
+
+    bboxes = []
+    for face in faces:
+        bbox = face['bbox']
+        x1, y1, x2, y2 = map(int, bbox)
+        bboxes.append([x1, y1, x2, y2])
+
+    return bboxes

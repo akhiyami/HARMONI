@@ -38,6 +38,8 @@ client = OpenAI(api_key=API_KEY)
 
 judge_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 judge_model = "mixtral"
+ollama_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+ollama_model = "mixtral"
 
 
 # --- System prompt for LLM-as-judge ---
@@ -84,6 +86,17 @@ PROMPT_CONTENT_PROFILE = """
 class JudgeResponseFormat(BaseModel):
     score: int
 
+def generate_ollama(question):
+    response = ollama_client.chat.completions.create(
+        model=ollama_model,
+        messages=[
+            {
+                "role": "user",
+                "content": question
+            }
+        ]
+    )
+    return response.choices[0].message.content
 
 def generate_gpt(question):
     response = client.chat.completions.create(

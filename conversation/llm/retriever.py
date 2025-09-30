@@ -10,7 +10,7 @@ from config.settings import NUM_TOP_FEATURES
 from conversation.memory.models import ContextualFeature
 
 
-COSINE_THRESHOLD = 0.3
+COSINE_THRESHOLD = 0.2
 
 # rag_model = SentenceTransformer("Qwen/Qwen3-Embedding-0.6B")
 # rag_model = SentenceTransformer("google/embeddinggemma-300m")

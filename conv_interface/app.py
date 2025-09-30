@@ -34,6 +34,8 @@ from conversation.llm.openai_inferences import generate_answer, update_memory_ll
 from conversation.memory.memory import user_retriever, update_memory, memory_retriever
 from conversation.memory.utils import create_table, empty_database
 
+from vision.detection import detect_faces_image
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 warnings.filterwarnings("ignore", category=UserWarning, module="face_recognition_models")
@@ -51,7 +53,10 @@ app.mount("/static", StaticFiles(directory="conv_interface/static"), name="stati
 
 # Global variables for user session management
 current_user = None
-current_session = deque(maxlen=LEN_HISTORY)
+old_sessions = []
+current_session = []
+
+current_context = ""
 
 # facial encoding model
 model_config = get_face_embedding_model("INSIGHTFACE")  # or "ULIP-p16" for Siglip
@@ -80,7 +85,7 @@ async def ask(question: str = Form(...)):
     """
     Handle the user's question, retrieve the answer from the LLM, and update the user's memory.
     """
-    global current_session, current_user, conn
+    global current_session, current_user, conn, current_context
 
     all_start = time.time()
 
@@ -113,9 +118,8 @@ async def ask(question: str = Form(...)):
     memory_thread.start()
 
     # Generate the answer using the LLM
-    context = None
+    context = current_context 
     answer, _ = generate_answer(question, current_session, context, conn, current_user)
-
     # Update the session history
     current_session.append({"role": "user", "content": question})
     current_session.append({"role": "assistant", "content": answer})
@@ -145,10 +149,11 @@ async def set_user(image: UploadFile = File(...)):
     if new_user != current_user :# Check if a new user was identified
 
         # Update the global variables and reset the session
+        old_sessions.append({"user": current_user, "session": current_session})
+
         current_user = new_user
         user_memory = new_memory
-        current_session = deque(maxlen=LEN_HISTORY)
-
+        current_session = []
         return {"user_id": current_user, "profile": user_memory}
     
     else:
@@ -157,7 +162,8 @@ async def set_user(image: UploadFile = File(...)):
     
 @app.post("/reset_session")
 async def reset_session():
-    global current_session
+    global current_session, current_user
+    old_sessions.append({"user": current_user, "session": current_session})
     current_session = []
     return {"status": "success"}
 
@@ -173,6 +179,19 @@ async def reset_database():
     conn.close()
     return {"status": "success"}
 
+@app.post("/restart_system")
+async def restart_system():
+    global current_session, current_user, old_sessions, current_context, conn
+
+    current_user = None
+    old_sessions = []
+    current_session = []
+    current_context = ""
+
+    conn.close()
+    conn = sqlite3.connect(database)
+
+    return {"status": "success"}
 
 @app.get("/get_context")
 async def get_context():
@@ -241,3 +260,62 @@ async def edit_user(
     return {"status": "success"}
     
     
+@app.post("/face_detection")
+async def face_detection(image: UploadFile = File(...)):
+    """
+    Perform face detection on the uploaded image.
+    """
+    image_bytes = await image.read()
+    img = Image.open(BytesIO(image_bytes)).convert("RGB")
+    
+    # Call the face detection function
+    bounding_boxes = detect_faces_image(img)
+    if len(bounding_boxes) == 0:
+        return {"error": "No faces detected."}
+    
+    elif len(bounding_boxes) > 1:
+        return {"error": "Multiple faces detected. Please upload an image with a single face."}
+
+    bounding_box = bounding_boxes[0]
+    bounding_box = {
+        "x": int(bounding_box[0]),
+        "y": int(bounding_box[1]),
+        "width": int(bounding_box[2] - bounding_box[0]),
+        "height": int(bounding_box[3] - bounding_box[1])
+    }
+
+    return {"bounding_box": bounding_box}
+
+
+
+@app.post("/save_experiment")
+async def save_experiment():
+    """
+    Save the current conversation experiment to a file.
+    """
+    global current_session, current_user, old_sessions, current_context
+
+    sessions = old_sessions.copy()
+    sessions.append({"user": current_user, "session": current_session})
+
+    profile = memory_retriever(current_user, conn)
+
+    context = current_context
+
+    experience = {
+        "user_id": current_user,
+        "profile": profile,
+        "context": context,
+        "sessions": sessions
+    }
+
+    # Save the experience to a file
+    result_path = "results/experiences"
+    os.makedirs(result_path, exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+
+    with open(f"{result_path}/experience_{timestamp}.json", "w") as f:
+        json.dump(experience, f, indent=4, ensure_ascii=False)
+
+    return {"status": "success"}

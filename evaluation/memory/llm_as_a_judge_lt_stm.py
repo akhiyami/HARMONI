@@ -40,6 +40,9 @@ client = OpenAI(api_key=API_KEY)
 judge_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 judge_model = "mixtral"
 
+ollama_client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+ollama_model = "mixtral"
+
 
 # --- System prompt for LLM-as-judge ---
 PROMPT_JUDGE_SYSTEM_FEATURE = {
@@ -85,6 +88,18 @@ PROMPT_CONTENT_PROFILE = """
 class JudgeResponseFormat(BaseModel):
     score: int
 
+
+def generate_ollama(question):
+    response = ollama_client.chat.completions.create(
+        model=ollama_model,
+        messages=[
+            {
+                "role": "user",
+                "content": question
+            }
+        ]
+    )
+    return response.choices[0].message.content
 
 def generate_gpt(question):
     response = client.chat.completions.create(
@@ -278,8 +293,8 @@ def summarize_session(observations, observations_session_llm, model):
     session_observations_llm = ".\n".join([obs[0] for obs in observations_session_llm])
 
     prompt = "Ecris une courte présentation de l'individu décrit par ces observations: {}"
-    description_gold = generate_gpt(prompt.format(session_observations_gold))
-    description_llm = generate_gpt(prompt.format(session_observations_llm))
+    description_gold = generate_ollama(prompt.format(session_observations_gold))
+    description_llm = generate_ollama(prompt.format(session_observations_llm))
 
     score_llm = evaluate_profile_with_llm(
         reference=description_gold,
@@ -357,7 +372,7 @@ if __name__ == "__main__":
 
     os.makedirs("results/locomo/ltm_stm", exist_ok=True)
 
-    for id in range(2, len(locomo_data)):
+    for id in range(len(locomo_data)):
         rouge_score = Rouge()
         model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 

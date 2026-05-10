@@ -11,6 +11,11 @@ Run the application in the root dir using:
 
 #--------------------------------------- Imports ---------------------------------------#
 
+# #fix for error
+# import pydub
+# pydub.AudioSegment.ffprobe = "/opt/homebrew/opt/ffmpeg@7/bin/ffprobe"
+
+
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

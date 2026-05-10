@@ -1,26 +1,53 @@
+# # Memory Module Configuration
+# memory: 
+#   closed_vocabulary: True
+#   vocabulary: 
+#     Personnalité: "Les traits de personnalité de l'utilisateur, son caractère et son comportement."
+#     Intérêts: "Les centres d'intérêt de l'utilisateur."
+#     Emploi: "Les informations professionnelles de l'utilisateur, y compris son emploi actuel et son parcours professionnel."
+#     Education: "Le parcours éducatif de l'utilisateur, y compris les établissements fréquentés et les diplômes obtenus."
+#     Famille: "Les membres de la famille de l'utilisateur, y compris les relations et les dynamiques familiales."
+#     Relations: "Les relations interpersonnelles de l'utilisateur, y compris les amis, les collègues et les connaissances."
+#     Loisirs: "Les activités de loisirs et les passe-temps de l'utilisateur, y compris les sports, les arts et les voyages."
+#     Santé: "Les informations sur la santé de l'utilisateur, y compris les conditions médicales et le bien-être général."
+#     Emploi_du_temps: "L'emploi du temps de l'utilisateur, y compris les engagements professionnels et personnels."
+#     Habitudes: "Les habitudes de l'utilisateur, y compris les routines quotidiennes et les comportements répétitifs."
+#     Alimentation: "Les habitudes alimentaires de l'utilisateur, y compris les préférences, les allergies et les régimes alimentaires."
+#     Technologie: "Le rapport de l'utilisateur avec la technologie, y compris les appareils utilisés et les compétences numériques."
+
 # Memory Module Configuration
-memory: 
+memory:
   closed_vocabulary: True
-  vocabulary: 
-    Personnalité: "Les traits de personnalité de l'utilisateur, son caractère et son comportement."
-    Intérêts: "Les centres d'intérêt de l'utilisateur."
-    Emploi: "Les informations professionnelles de l'utilisateur, y compris son emploi actuel et son parcours professionnel."
-    Education: "Le parcours éducatif de l'utilisateur, y compris les établissements fréquentés et les diplômes obtenus."
-    Famille: "Les membres de la famille de l'utilisateur, y compris les relations et les dynamiques familiales."
-    Relations: "Les relations interpersonnelles de l'utilisateur, y compris les amis, les collègues et les connaissances."
-    Loisirs: "Les activités de loisirs et les passe-temps de l'utilisateur, y compris les sports, les arts et les voyages."
-    Santé: "Les informations sur la santé de l'utilisateur, y compris les conditions médicales et le bien-être général."
-    Emploi_du_temps: "L'emploi du temps de l'utilisateur, y compris les engagements professionnels et personnels."
-    Habitudes: "Les habitudes de l'utilisateur, y compris les routines quotidiennes et les comportements répétitifs."
-    Alimentation: "Les habitudes alimentaires de l'utilisateur, y compris les préférences, les allergies et les régimes alimentaires."
-    Technologie: "Le rapport de l'utilisateur avec la technologie, y compris les appareils utilisés et les compétences numériques."
+  vocabulary:
+    Personality: "The user's personality traits, character, and behavior."
+    Interests: "The user's interests."
+    Employment: "The user's professional information, including their current job and career path."
+    Education: "The user's educational background, including institutions attended and degrees earned."
+    Family: "The user's family members, including family relationships and dynamics."
+    Relationships: "The user's interpersonal relationships, including friends, colleagues, and acquaintances."
+    Hobbies: "The user's leisure activities and hobbies, including sports, arts, and travel."
+    Health: "Information about the user's health, including medical conditions and general well-being."
+    Schedule: "The user's schedule, including work and personal commitments." 
+    Habits: "The user's habits, including daily routines and repetitive behaviors."
+    Diet: "The user's eating habits, including preferences, allergies, and dietary restrictions."
+    Technology: "The user's relationship with technology, including the devices used and digital skills."
+
+
 
 #llm configuration
 reply-llm:
-  model: "gpt-4o"
+  model: "llama3"
   temperature: 0
   max_tokens: -1
 memory-llm:
-  model: "gpt-4o"
+  model: "llama3"
   temperature: 0
   max_tokens: -1
+# reply-llm:
+#   model: "gpt-4o"
+#   temperature: 0
+#   max_tokens: -1
+# memory-llm:
+#   model: "gpt-4o"
+#   temperature: 0
+#   max_tokens: -1

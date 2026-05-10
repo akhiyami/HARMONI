@@ -1,5 +1,8 @@
 ### Git ignore file for Python projects
 
+IMG_2443.MOV
+huggingfacetoken.txt
+
 # Projet-specific files
 conv_interface/static/users_images/
 test.ipynb
